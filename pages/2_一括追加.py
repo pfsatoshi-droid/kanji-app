@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-
-DATA_PATH = Path("kanji.tsv")
+from data_store import load_df, save_df_to_sheet
 
 st.set_page_config(page_title="漢字情報 一括追加アプリ", layout="centered")
 
@@ -11,15 +9,18 @@ st.title("漢字情報 一括追加アプリ")
 # =========================
 # データ読み込み
 # =========================
-if DATA_PATH.exists():
-    df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
-else:
-    df = pd.DataFrame(columns=["漢字", "画数", "漢検級", "メモ"])
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
+    st.stop()
 
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
     if col not in df.columns:
         df[col] = ""
+
 
 def get_pair_numbers(df):
     nums = []
@@ -29,6 +30,7 @@ def get_pair_numbers(df):
             if num.isdigit():
                 nums.append(int(num))
     return sorted(nums)
+
 
 def save_df(df):
     base_cols = ["漢字", "画数", "漢検級", "メモ"]
@@ -42,7 +44,14 @@ def save_df(df):
     ordered_cols = base_cols + pair_cols + other_cols
 
     df = df[ordered_cols]
-    df.to_csv(DATA_PATH, sep="\t", index=False)
+
+    try:
+        save_df_to_sheet(df)
+    except Exception as e:
+        st.error("Googleスプレッドシートへの保存に失敗しました。")
+        st.exception(e)
+        st.stop()
+
 
 # =========================
 # 一括追加フォーム
@@ -117,6 +126,8 @@ if st.button("一括追加", type="primary"):
         skipped = []
 
         for k in kanji_list:
+            k = k.strip()
+
             if len(k) != 1:
                 skipped.append(k)
                 continue
