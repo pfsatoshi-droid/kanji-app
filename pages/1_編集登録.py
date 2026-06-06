@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
 
-st.set_page_config(page_title="漢字を見る・編集", layout="wide")
+st.set_page_config(page_title="漢字編集・検索", layout="wide")
 
-st.title("漢字を見る・編集")
+st.title("漢字編集・検索")
 
 
 # =========================
@@ -134,46 +134,6 @@ def save_df(df):
         st.stop()
 
 
-def find_kanji_using_part(df, part):
-    results = []
-
-    if part == "":
-        return results
-
-    for _, row in df.iterrows():
-        kanji = str(row.get("漢字", "")).strip()
-        if kanji == "":
-            continue
-
-        for n in get_pair_numbers(df):
-            p1 = str(row.get(f"ペア{n}_部品1", "")).strip()
-            p2 = str(row.get(f"ペア{n}_部品2", "")).strip()
-
-            if part == p1 or part == p2:
-                results.append(kanji)
-                break
-
-    return sorted(set(results))
-
-
-def has_any_pair(row, df):
-    for n in get_pair_numbers(df):
-        p1 = str(row.get(f"ペア{n}_部品1", "")).strip()
-        p2 = str(row.get(f"ペア{n}_部品2", "")).strip()
-        if p1 != "" or p2 != "":
-            return True
-    return False
-
-
-def has_review_pair(row, df):
-    for n in get_pair_numbers(df):
-        review = str(row.get(f"ペア{n}_審議", "")).strip()
-        reason = str(row.get(f"ペア{n}_審議理由", "")).strip()
-        if review == "TRUE" or reason != "":
-            return True
-    return False
-
-
 def make_pair_table(existing_pairs):
     return pd.DataFrame(
         [
@@ -222,92 +182,7 @@ if kanji:
         current_memo = row.get("メモ", "")
 
 
-tab_view, tab_edit, tab_table = st.tabs(["見る", "編集する", "絞り込みテーブル"])
-
-
-# =========================
-# 見るタブ
-# =========================
-with tab_view:
-    st.subheader("見る")
-
-    if not kanji:
-        st.info("見たい漢字を上の入力欄に入れてください。")
-
-    elif matched.empty:
-        st.warning(f"{kanji} はまだ登録されていません。")
-        st.write("登録する場合は「編集する」タブから追加できます。")
-
-    else:
-        st.markdown(f"# {kanji}")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric("画数", current_strokes if current_strokes else "未登録")
-
-        with col2:
-            st.metric("漢検級", current_level if current_level else "未登録")
-
-        with col3:
-            st.metric("登録ペア数", len(existing_pairs))
-
-        if current_memo:
-            st.divider()
-            st.subheader("メモ")
-            st.write(current_memo)
-
-        st.divider()
-        st.subheader("部品ペア")
-
-        if not existing_pairs:
-            st.info("まだ部品ペアは登録されていません。")
-        else:
-            for pair in existing_pairs:
-                p1 = pair["part1"]
-                p2 = pair["part2"]
-                review = pair["review"]
-                reason = pair["reason"]
-
-                if review == "TRUE":
-                    st.warning(f"ペア{pair['num']}：{p1} + {p2}　【審議中】")
-                    if reason:
-                        st.caption(f"理由：{reason}")
-                else:
-                    st.success(f"ペア{pair['num']}：{p1} + {p2}")
-
-            st.dataframe(
-                make_pair_table(existing_pairs),
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        st.divider()
-        st.subheader("部品の逆引き")
-
-        if existing_pairs:
-            used_parts = []
-
-            for pair in existing_pairs:
-                if pair["part1"]:
-                    used_parts.append(pair["part1"])
-                if pair["part2"]:
-                    used_parts.append(pair["part2"])
-
-            used_parts = sorted(set(used_parts))
-
-            for part in used_parts:
-                related_kanji = find_kanji_using_part(df, part)
-
-                with st.expander(f"部品「{part}」が使われている漢字：{len(related_kanji)} 件"):
-                    st.text_area(
-                        f"「{part}」使用漢字コピー用",
-                        value="".join(related_kanji),
-                        height=80,
-                        key=f"view_part_copy_{part}",
-                    )
-
-                    st.write("、".join(related_kanji) if related_kanji else "なし")
+tab_edit, tab_table = st.tabs(["編集する", "絞り込みテーブル"])
 
 
 # =========================
