@@ -1,9 +1,7 @@
 import re
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-
-DATA_PATH = Path("kanji.tsv")
+from data_store import load_df, save_df_to_sheet
 
 st.set_page_config(page_title="漢字ペア CSV取り込みアプリ", layout="wide")
 
@@ -12,10 +10,12 @@ st.title("漢字ペア CSV取り込みアプリ")
 # =========================
 # メインDB読み込み
 # =========================
-if DATA_PATH.exists():
-    df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
-else:
-    df = pd.DataFrame(columns=["漢字", "画数", "漢検級", "メモ"])
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
+    st.stop()
 
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
@@ -96,7 +96,13 @@ def save_df(df):
     ordered_cols = base_cols + pair_cols + other_cols
 
     df = df[ordered_cols]
-    df.to_csv(DATA_PATH, sep="\t", index=False)
+
+    try:
+        save_df_to_sheet(df)
+    except Exception as e:
+        st.error("Googleスプレッドシートへの保存に失敗しました。")
+        st.exception(e)
+        st.stop()
 
 
 def read_uploaded_csv(uploaded_file):
@@ -233,10 +239,6 @@ if uploaded_file is not None:
 
                     imported_pairs.append((p1, p2))
 
-                if not imported_pairs:
-                    # ペアがない行も、漢字情報だけ取り込みたい場合があるので完全スキップはしない
-                    pass
-
                 matched = df[df["漢字"] == k]
 
                 if not matched.empty:
@@ -304,7 +306,7 @@ if uploaded_file is not None:
             st.rerun()
 
     except Exception as e:
-        st.error("CSVの読み込み中にエラーが起きました。")
+        st.error("CSVの読み込み・取り込み中にエラーが起きました。")
         st.exception(e)
 
 st.divider()
