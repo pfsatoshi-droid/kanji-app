@@ -1,12 +1,8 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-from datetime import datetime
-import shutil
 import re
-
-DATA_PATH = Path("kanji.tsv")
-BACKUP_DIR = Path("backups")
+from datetime import datetime
+from data_store import load_df, save_df_to_sheet
 
 st.set_page_config(page_title="漢字行 削除アプリ", layout="wide")
 
@@ -15,19 +11,18 @@ st.title("漢字行 削除アプリ")
 # =========================
 # データ読み込み
 # =========================
-if not DATA_PATH.exists():
-    st.error("kanji.tsv が見つかりません。")
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
     st.stop()
-
-df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
 
 if "漢字" not in df.columns:
-    st.error("kanji.tsv に『漢字』列がありません。")
+    st.error("Googleスプレッドシートに『漢字』列がありません。")
     st.stop()
 
-BACKUP_DIR.mkdir(exist_ok=True)
-
-st.success(f"kanji.tsv を読み込みました。現在の登録行数：{len(df)} 件")
+st.success(f"Googleスプレッドシートを読み込みました。現在の登録行数：{len(df)} 件")
 
 
 # =========================
@@ -111,15 +106,13 @@ def extract_line_numbers(text):
     return line_numbers
 
 
-def make_backup():
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = BACKUP_DIR / f"kanji_before_delete_{timestamp}.tsv"
-    shutil.copy2(DATA_PATH, backup_path)
-    return backup_path
-
-
 def save_df(df):
-    df.to_csv(DATA_PATH, sep="\t", index=False)
+    try:
+        save_df_to_sheet(df)
+    except Exception as e:
+        st.error("Googleスプレッドシートへの保存に失敗しました。")
+        st.exception(e)
+        st.stop()
 
 
 def get_rows_by_kanji(df, chars):
@@ -139,7 +132,7 @@ def get_rows_by_kanji(df, chars):
 
 def get_rows_by_line_numbers(df, line_numbers):
     """
-    kanji.tsv 上の行番号から削除対象行を取得する。
+    Googleスプレッドシート上の行番号から削除対象行を取得する。
     ヘッダーを1行目として扱うので、データ1件目は2行目。
     """
 
@@ -147,12 +140,12 @@ def get_rows_by_line_numbers(df, line_numbers):
     invalid_line_numbers = []
 
     for line_no in line_numbers:
-        # TSVでは1行目がヘッダーなので、データ行のindexは line_no - 2
+        # スプレッドシートでは1行目がヘッダーなので、データ行のindexは line_no - 2
         idx = line_no - 2
 
         if 0 <= idx < len(df):
             valid_records.append({
-                "kanji.tsv上の行番号": line_no,
+                "スプレッドシート上の行番号": line_no,
                 "index": idx,
             })
         else:
@@ -169,18 +162,36 @@ def get_rows_by_line_numbers(df, line_numbers):
 
 def add_display_line_number(df_part):
     """
-    表示用に kanji.tsv 上の行番号を先頭に追加する。
+    表示用に Googleスプレッドシート上の行番号を先頭に追加する。
     ヘッダーを1行目として、データ行は2行目から。
     """
 
     result = df_part.copy()
-    result.insert(0, "kanji.tsv上の行番号", result.index + 2)
+    result.insert(0, "スプレッドシート上の行番号", result.index + 2)
     return result
 
 
 # =========================
+# 削除前バックアップ案内
+# =========================
+st.subheader("削除前バックアップ")
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+backup_data = df.to_csv(sep="\t", index=False).encode("utf-8-sig")
+
+st.download_button(
+    label="現在のデータをTSVバックアップとしてダウンロード",
+    data=backup_data,
+    file_name=f"kanji_before_delete_{timestamp}.tsv",
+    mime="text/tab-separated-values",
+)
+
+st.caption("削除前にバックアップをダウンロードしておくと安全です。Googleスプレッドシート側にも変更履歴があります。")
+
+# =========================
 # 削除方法選択
 # =========================
+st.divider()
 st.subheader("削除方法を選択してください")
 
 delete_mode = st.radio(
@@ -193,10 +204,9 @@ delete_mode = st.radio(
     index=0
 )
 
-st.caption("行番号は、kanji.tsv をExcelやVS Codeで開いたときの行番号です。1行目はヘッダーなので、最初のデータ行は2行目です。")
+st.caption("行番号は、Googleスプレッドシート上の行番号です。1行目はヘッダーなので、最初のデータ行は2行目です。")
 
 target_indices = set()
-all_warnings = []
 
 # =========================
 # 漢字指定
@@ -235,7 +245,7 @@ if delete_mode in ["漢字で削除", "漢字と行番号の両方で削除"]:
             target_indices.update(target_by_kanji.index.tolist())
 
         if not_found_chars:
-            st.info("以下の文字は kanji.tsv に存在しないため、削除されません。")
+            st.info("以下の文字はデータベースに存在しないため、削除されません。")
             st.text_area(
                 "未登録・削除対象外",
                 value="".join(not_found_chars),
@@ -254,7 +264,7 @@ if delete_mode in ["行番号で削除", "漢字と行番号の両方で削除"]
     st.subheader("行番号で削除")
 
     line_text = st.text_area(
-        "削除したい kanji.tsv 上の行番号を入力してください",
+        "削除したいGoogleスプレッドシート上の行番号を入力してください",
         height=150,
         placeholder="例：\n2\n5\n10\nまたは 2,5,10"
     )
@@ -337,7 +347,7 @@ if target_indices:
     )
 
     confirm_checkbox = st.checkbox(
-        "削除前に自動バックアップを作成してから削除することを確認しました",
+        "削除前に必要なバックアップを取ったことを確認しました",
         value=False
     )
 
@@ -351,8 +361,6 @@ if target_indices:
         elif not confirm_checkbox:
             st.error("確認チェックを入れてください。")
         else:
-            backup_path = make_backup()
-
             before_count = len(df)
 
             df_after = df.drop(index=sorted_indices).reset_index(drop=True)
@@ -362,8 +370,7 @@ if target_indices:
 
             save_df(df_after)
 
-            st.success(f"{deleted_count} 行を削除しました。")
-            st.info(f"削除前のバックアップを作成しました：{backup_path}")
+            st.success(f"{deleted_count} 行をGoogleスプレッドシートから削除しました。")
 
             st.rerun()
 
@@ -376,6 +383,6 @@ else:
 # =========================
 st.divider()
 
-with st.expander("現在の kanji.tsv を表示"):
+with st.expander("現在のデータベースを表示"):
     display_df = add_display_line_number(df)
     st.dataframe(display_df, use_container_width=True, hide_index=True)
