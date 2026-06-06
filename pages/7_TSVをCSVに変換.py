@@ -1,30 +1,29 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
 from datetime import datetime
+from data_store import load_df
 
-DATA_PATH = Path("kanji.tsv")
+st.set_page_config(page_title="CSVに変換", layout="wide")
 
-st.set_page_config(page_title="TSVをCSVに変換", layout="wide")
-
-st.title("TSVをCSVに変換")
+st.title("CSVに変換")
 
 st.write(
     """
-    `kanji.tsv` を読み込み、列名を英語形式に変換してCSVとして出力します。
+    Googleスプレッドシート上の漢字データを読み込み、列名を英語形式に変換してCSVとして出力します。
     """
 )
 
 # =========================
 # データ読み込み
 # =========================
-if not DATA_PATH.exists():
-    st.error("kanji.tsv が見つかりません。")
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
     st.stop()
 
-df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
-
-st.success(f"kanji.tsv を読み込みました。行数：{len(df)} 件")
+st.success(f"Googleスプレッドシートを読み込みました。行数：{len(df)} 件")
 
 st.subheader("変換前プレビュー")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)
@@ -265,7 +264,7 @@ st.subheader("変換後プレビュー")
 if sort_output:
     st.info("現在のプレビューは、漢検級 → 画数 → 漢字 の順でソートされています。")
 else:
-    st.info("現在のプレビューは、kanji.tsv の元の順番です。")
+    st.info("現在のプレビューは、スプレッドシートの元の順番です。")
 
 if convert_level_to_number:
     st.info("漢検級は数字に変換されています。例：10級→10、準2級→2.5、準1級→1.5")
@@ -300,33 +299,3 @@ st.download_button(
     file_name=default_filename,
     mime="text/csv"
 )
-
-# =========================
-# 任意でローカル保存
-# =========================
-st.divider()
-st.subheader("ローカルにも保存する")
-
-default_save_parts = ["kanji_converted"]
-
-if sort_output:
-    default_save_parts.append("sorted")
-
-if convert_level_to_number:
-    default_save_parts.append("levelnum")
-
-default_save_name = "_".join(default_save_parts) + ".csv"
-
-save_name = st.text_input(
-    "保存ファイル名",
-    value=default_save_name
-)
-
-if st.button("kanji_app フォルダにCSVを保存"):
-    if not save_name.endswith(".csv"):
-        save_name += ".csv"
-
-    save_path = Path(save_name)
-    converted_df.to_csv(save_path, index=False, encoding="utf-8-sig")
-
-    st.success(f"保存しました：{save_path}")
