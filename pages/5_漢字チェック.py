@@ -1,24 +1,23 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-
-DATA_PATH = Path("kanji.tsv")
+from data_store import load_df
 
 st.set_page_config(page_title="漢字リスト照合アプリ", layout="wide")
 
 st.title("漢字リスト照合アプリ")
 
 # =========================
-# kanji.tsv 読み込み
+# Googleスプレッドシート 読み込み
 # =========================
-if not DATA_PATH.exists():
-    st.error("kanji.tsv が見つかりません。")
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
     st.stop()
 
-df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
-
 if "漢字" not in df.columns:
-    st.error("kanji.tsv に『漢字』列がありません。")
+    st.error("Googleスプレッドシートに『漢字』列がありません。")
     st.stop()
 
 registered_kanji_list = (
@@ -32,7 +31,7 @@ registered_kanji_list = (
 registered_kanji_list = [k for k in registered_kanji_list if k != ""]
 registered_kanji_set = set(registered_kanji_list)
 
-st.success(f"kanji.tsv の登録漢字数：{len(registered_kanji_set)} 件")
+st.success(f"Googleスプレッドシートの登録漢字数：{len(registered_kanji_set)} 件")
 
 
 # =========================
@@ -117,8 +116,8 @@ st.divider()
 check_mode = st.radio(
     "チェック内容",
     [
-        "貼り付けリストにあるが、kanji.tsv にない漢字を出す",
-        "kanji.tsv にあるが、貼り付けリストにない漢字を出す",
+        "貼り付けリストにあるが、データベースにない漢字を出す",
+        "データベースにあるが、貼り付けリストにない漢字を出す",
         "両方チェックする",
     ],
     index=0
@@ -147,7 +146,7 @@ if st.button("チェックする", type="primary"):
     st.subheader("入力リストの概要")
 
     st.write(f"貼り付けたユニーク文字数：{len(input_chars)} 件")
-    st.write(f"kanji.tsv の登録漢字数：{len(registered_kanji_set)} 件")
+    st.write(f"データベースの登録漢字数：{len(registered_kanji_set)} 件")
 
     # 文字化け文字チェック
     replacement_records = [r for r in input_records if r["漢字"] == "�"]
@@ -159,10 +158,10 @@ if st.button("チェックする", type="primary"):
         st.dataframe(replacement_df, use_container_width=True, hide_index=True)
 
     # =========================
-    # 1. 入力にあるが kanji.tsv にない
+    # 1. 入力にあるがDBにない
     # =========================
     if check_mode in [
-        "貼り付けリストにあるが、kanji.tsv にない漢字を出す",
+        "貼り付けリストにあるが、データベースにない漢字を出す",
         "両方チェックする",
     ]:
         missing_records = [
@@ -173,12 +172,12 @@ if st.button("チェックする", type="primary"):
         missing_chars = [r["漢字"] for r in missing_records]
 
         st.divider()
-        st.subheader("貼り付けリストにあるが、kanji.tsv にない漢字")
+        st.subheader("貼り付けリストにあるが、データベースにない漢字")
 
         st.write(f"未登録：{len(missing_chars)} 件")
 
         if missing_chars:
-            st.warning("kanji.tsv に含まれていない漢字があります。")
+            st.warning("データベースに含まれていない漢字があります。")
 
             st.text_area(
                 "コピー用",
@@ -206,13 +205,13 @@ if st.button("チェックする", type="primary"):
                 mime="text/csv"
             )
         else:
-            st.success("貼り付けリストの文字はすべて kanji.tsv に登録済みです。")
+            st.success("貼り付けリストの文字はすべてデータベースに登録済みです。")
 
     # =========================
-    # 2. kanji.tsv にあるが入力にない
+    # 2. DBにあるが入力にない
     # =========================
     if check_mode in [
-        "kanji.tsv にあるが、貼り付けリストにない漢字を出す",
+        "データベースにあるが、貼り付けリストにない漢字を出す",
         "両方チェックする",
     ]:
         extra_chars = [
@@ -221,12 +220,12 @@ if st.button("チェックする", type="primary"):
         ]
 
         st.divider()
-        st.subheader("kanji.tsv にあるが、貼り付けリストにない漢字")
+        st.subheader("データベースにあるが、貼り付けリストにない漢字")
 
         st.write(f"対象外候補：{len(extra_chars)} 件")
 
         if extra_chars:
-            st.warning("kanji.tsv にはあるが、貼り付けリストには含まれていない漢字があります。")
+            st.warning("データベースにはあるが、貼り付けリストには含まれていない漢字があります。")
 
             st.text_area(
                 "コピー用",
@@ -235,7 +234,7 @@ if st.button("チェックする", type="primary"):
                 key="extra_copy"
             )
 
-            # kanji.tsv 側の行番号を付ける
+            # スプレッドシート側の行番号を付ける
             extra_records = []
 
             for row_no, row in df.reset_index(drop=True).iterrows():
@@ -244,7 +243,7 @@ if st.button("チェックする", type="primary"):
                 if k != "" and k in extra_chars:
                     record = {
                         "漢字": k,
-                        "kanji.tsv上の行番号": row_no + 2,  # ヘッダーが1行目なのでデータは2行目から
+                        "スプレッドシート上の行番号": row_no + 2,  # ヘッダーが1行目なのでデータは2行目から
                     }
 
                     # 追加情報もあると便利
@@ -278,7 +277,7 @@ if st.button("チェックする", type="primary"):
                 mime="text/csv"
             )
         else:
-            st.success("kanji.tsv の漢字はすべて貼り付けリストに含まれています。")
+            st.success("データベースの漢字はすべて貼り付けリストに含まれています。")
 
     # =========================
     # 入力リスト全体を確認
@@ -293,5 +292,5 @@ if st.button("チェックする", type="primary"):
 
 st.divider()
 
-with st.expander("現在の kanji.tsv を表示"):
+with st.expander("現在のデータベースを表示"):
     st.dataframe(df, use_container_width=True, hide_index=True)
