@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-
-DATA_PATH = Path("kanji.tsv")
+from data_store import load_df, save_df_to_sheet
 
 st.set_page_config(page_title="漢字部品ペア登録アプリ", layout="centered")
 
@@ -11,10 +9,12 @@ st.title("漢字部品ペア登録アプリ")
 # =========================
 # データ読み込み
 # =========================
-if DATA_PATH.exists():
-    df = pd.read_csv(DATA_PATH, sep="\t", dtype=str).fillna("")
-else:
-    df = pd.DataFrame(columns=["漢字", "画数", "漢検級", "メモ"])
+try:
+    df = load_df()
+except Exception as e:
+    st.error("Googleスプレッドシートからの読み込みに失敗しました。")
+    st.exception(e)
+    st.stop()
 
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
@@ -58,8 +58,8 @@ def ensure_pair_columns(df, pair_num):
 def get_pairs_from_row(row, df):
     pairs = []
     for n in get_pair_numbers(df):
-        p1 = row.get(f"ペア{n}_部品1", "")
-        p2 = row.get(f"ペア{n}_部品2", "")
+        p1 = str(row.get(f"ペア{n}_部品1", "")).strip()
+        p2 = str(row.get(f"ペア{n}_部品2", "")).strip()
         if p1 != "" or p2 != "":
             pairs.append((n, p1, p2))
     return pairs
@@ -98,7 +98,13 @@ def save_df(df):
     ordered_cols = base_cols + pair_cols + other_cols
 
     df = df[ordered_cols]
-    df.to_csv(DATA_PATH, sep="\t", index=False)
+
+    try:
+        save_df_to_sheet(df)
+    except Exception as e:
+        st.error("Googleスプレッドシートへの保存に失敗しました。")
+        st.exception(e)
+        st.stop()
 
 
 # =========================
@@ -199,7 +205,7 @@ if kanji:
             df.loc[row_index, "メモ"] = memo
 
         save_df(df)
-        st.success(f"{kanji} の情報を保存しました。")
+        st.success(f"{kanji} の情報をGoogleスプレッドシートに保存しました。")
         st.rerun()
 
     # =========================
@@ -233,6 +239,9 @@ if kanji:
     add_part2 = st.text_input("追加する部品2", placeholder="例：土", key="add_part2")
 
     if st.button("このペアを追加", type="primary"):
+        add_part1 = add_part1.strip()
+        add_part2 = add_part2.strip()
+
         if add_part1 == "" or add_part2 == "":
             st.error("部品1と部品2を両方入力してください。")
         else:
@@ -282,6 +291,9 @@ if kanji:
 
         with col1:
             if st.button("このペアを更新"):
+                edit_part1 = edit_part1.strip()
+                edit_part2 = edit_part2.strip()
+
                 if edit_part1 == "" or edit_part2 == "":
                     st.error("部品1と部品2を両方入力してください。")
                 else:
