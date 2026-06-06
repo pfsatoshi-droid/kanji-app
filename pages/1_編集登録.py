@@ -6,6 +6,7 @@ st.set_page_config(page_title="漢字部品ペア登録アプリ", layout="cente
 
 st.title("漢字部品ペア登録アプリ")
 
+
 # =========================
 # データ読み込み
 # =========================
@@ -16,10 +17,12 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
+
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
     if col not in df.columns:
         df[col] = ""
+
 
 # 古い形式「部品1」「部品2」がある場合、ペア1に変換
 if "部品1" in df.columns and "部品2" in df.columns:
@@ -46,41 +49,66 @@ def get_pair_numbers(df):
 def ensure_pair_columns(df, pair_num):
     col1 = f"ペア{pair_num}_部品1"
     col2 = f"ペア{pair_num}_部品2"
+    review_col = f"ペア{pair_num}_審議"
+    reason_col = f"ペア{pair_num}_審議理由"
 
-    if col1 not in df.columns:
-        df[col1] = ""
-    if col2 not in df.columns:
-        df[col2] = ""
+    for col in [col1, col2, review_col, reason_col]:
+        if col not in df.columns:
+            df[col] = ""
 
     return df
 
 
 def get_pairs_from_row(row, df):
     pairs = []
+
     for n in get_pair_numbers(df):
         p1 = str(row.get(f"ペア{n}_部品1", "")).strip()
         p2 = str(row.get(f"ペア{n}_部品2", "")).strip()
+        review = str(row.get(f"ペア{n}_審議", "")).strip()
+        reason = str(row.get(f"ペア{n}_審議理由", "")).strip()
+
         if p1 != "" or p2 != "":
-            pairs.append((n, p1, p2))
+            pairs.append(
+                {
+                    "num": n,
+                    "part1": p1,
+                    "part2": p2,
+                    "review": review,
+                    "reason": reason,
+                }
+            )
+
     return pairs
 
 
 def rewrite_pairs_to_row(df, row_index, pairs):
     """
-    pairs は [(部品1, 部品2), ...] の形。
+    pairs は以下の形：
+    [
+        {"part1": "木", "part2": "喬", "review": "TRUE", "reason": "..."},
+        ...
+    ]
+
     既存のペア列をいったん空にして、ペア1から詰め直す。
     """
 
     # 既存ペア列を空にする
     for n in get_pair_numbers(df):
+        df = ensure_pair_columns(df, n)
         df.loc[row_index, f"ペア{n}_部品1"] = ""
         df.loc[row_index, f"ペア{n}_部品2"] = ""
+        df.loc[row_index, f"ペア{n}_審議"] = ""
+        df.loc[row_index, f"ペア{n}_審議理由"] = ""
 
     # 新しいペアを1から順番に書き込む
-    for i, (p1, p2) in enumerate(pairs, start=1):
+    for i, pair in enumerate(pairs, start=1):
         df = ensure_pair_columns(df, i)
-        df.loc[row_index, f"ペア{i}_部品1"] = p1
-        df.loc[row_index, f"ペア{i}_部品2"] = p2
+
+        df.loc[row_index, f"ペア{i}_部品1"] = pair.get("part1", "")
+        df.loc[row_index, f"ペア{i}_部品2"] = pair.get("part2", "")
+        df.loc[row_index, f"ペア{i}_審議"] = pair.get("review", "")
+        df.loc[row_index, f"ペア{i}_審議理由"] = pair.get("reason", "")
 
     return df
 
@@ -93,6 +121,8 @@ def save_df(df):
     for n in get_pair_numbers(df):
         pair_cols.append(f"ペア{n}_部品1")
         pair_cols.append(f"ペア{n}_部品2")
+        pair_cols.append(f"ペア{n}_審議")
+        pair_cols.append(f"ペア{n}_審議理由")
 
     other_cols = [c for c in df.columns if c not in base_cols + pair_cols]
     ordered_cols = base_cols + pair_cols + other_cols
@@ -218,11 +248,13 @@ if kanji:
         pair_table = pd.DataFrame(
             [
                 {
-                    "ペア番号": n,
-                    "部品1": p1,
-                    "部品2": p2,
+                    "ペア番号": pair["num"],
+                    "部品1": pair["part1"],
+                    "部品2": pair["part2"],
+                    "審議": "審議中" if pair["review"] == "TRUE" else "",
+                    "審議理由": pair["reason"],
                 }
-                for n, p1, p2 in existing_pairs
+                for pair in existing_pairs
             ]
         )
         st.dataframe(pair_table, use_container_width=True, hide_index=True)
@@ -237,6 +269,18 @@ if kanji:
 
     add_part1 = st.text_input("追加する部品1", placeholder="例：一", key="add_part1")
     add_part2 = st.text_input("追加する部品2", placeholder="例：土", key="add_part2")
+
+    add_review = st.checkbox(
+        "このペアを審議対象にする",
+        value=False,
+        key="add_review"
+    )
+
+    add_review_reason = st.text_area(
+        "審議理由",
+        placeholder="例：この分け方でよいか意見が分かれそう",
+        key="add_review_reason"
+    )
 
     if st.button("このペアを追加", type="primary"):
         add_part1 = add_part1.strip()
@@ -256,15 +300,36 @@ if kanji:
                 row_index = df.index[-1]
                 existing_pairs = []
 
-            current_pairs = [(p1, p2) for _, p1, p2 in existing_pairs]
+            current_pairs = [
+                {
+                    "part1": pair["part1"],
+                    "part2": pair["part2"],
+                    "review": pair["review"],
+                    "reason": pair["reason"],
+                }
+                for pair in existing_pairs
+            ]
 
-            if (add_part1, add_part2) in current_pairs:
+            if any(pair["part1"] == add_part1 and pair["part2"] == add_part2 for pair in current_pairs):
                 st.error(f"すでに登録されています：{kanji} → {add_part1}, {add_part2}")
             else:
-                current_pairs.append((add_part1, add_part2))
+                current_pairs.append(
+                    {
+                        "part1": add_part1,
+                        "part2": add_part2,
+                        "review": "TRUE" if add_review else "",
+                        "reason": add_review_reason.strip(),
+                    }
+                )
+
                 df = rewrite_pairs_to_row(df, row_index, current_pairs)
                 save_df(df)
-                st.success(f"追加しました：{kanji} → {add_part1}, {add_part2}")
+
+                if add_review:
+                    st.success(f"審議対象として追加しました：{kanji} → {add_part1}, {add_part2}")
+                else:
+                    st.success(f"追加しました：{kanji} → {add_part1}, {add_part2}")
+
                 st.rerun()
 
     # =========================
@@ -275,17 +340,37 @@ if kanji:
         st.subheader("登録済みペアを編集・削除")
 
         pair_labels = [
-            f"ペア{n}: {p1}, {p2}"
-            for n, p1, p2 in existing_pairs
+            f"ペア{pair['num']}: {pair['part1']}, {pair['part2']}"
+            + ("【審議中】" if pair["review"] == "TRUE" else "")
+            for pair in existing_pairs
         ]
 
         selected_label = st.selectbox("編集・削除するペアを選択", pair_labels)
 
         selected_index = pair_labels.index(selected_label)
-        selected_num, old_p1, old_p2 = existing_pairs[selected_index]
+        selected_pair = existing_pairs[selected_index]
+
+        selected_num = selected_pair["num"]
+        old_p1 = selected_pair["part1"]
+        old_p2 = selected_pair["part2"]
+        old_review = selected_pair["review"]
+        old_reason = selected_pair["reason"]
 
         edit_part1 = st.text_input("編集後の部品1", value=old_p1, key="edit_part1")
         edit_part2 = st.text_input("編集後の部品2", value=old_p2, key="edit_part2")
+
+        edit_review = st.checkbox(
+            "このペアを審議対象にする",
+            value=(old_review == "TRUE"),
+            key="edit_review"
+        )
+
+        edit_review_reason = st.text_area(
+            "審議理由",
+            value=old_reason,
+            placeholder="例：別の分け方もありそう",
+            key="edit_review_reason"
+        )
 
         col1, col2 = st.columns(2)
 
@@ -297,10 +382,26 @@ if kanji:
                 if edit_part1 == "" or edit_part2 == "":
                     st.error("部品1と部品2を両方入力してください。")
                 else:
-                    current_pairs = [(p1, p2) for _, p1, p2 in existing_pairs]
-                    current_pairs[selected_index] = (edit_part1, edit_part2)
+                    current_pairs = [
+                        {
+                            "part1": pair["part1"],
+                            "part2": pair["part2"],
+                            "review": pair["review"],
+                            "reason": pair["reason"],
+                        }
+                        for pair in existing_pairs
+                    ]
 
-                    if len(current_pairs) != len(set(current_pairs)):
+                    current_pairs[selected_index] = {
+                        "part1": edit_part1,
+                        "part2": edit_part2,
+                        "review": "TRUE" if edit_review else "",
+                        "reason": edit_review_reason.strip(),
+                    }
+
+                    pair_keys = [(pair["part1"], pair["part2"]) for pair in current_pairs]
+
+                    if len(pair_keys) != len(set(pair_keys)):
                         st.error("同じペアが重複しています。別の内容にしてください。")
                     else:
                         df = rewrite_pairs_to_row(df, row_index, current_pairs)
@@ -310,13 +411,22 @@ if kanji:
 
         with col2:
             if st.button("このペアを削除"):
-                current_pairs = [(p1, p2) for _, p1, p2 in existing_pairs]
+                current_pairs = [
+                    {
+                        "part1": pair["part1"],
+                        "part2": pair["part2"],
+                        "review": pair["review"],
+                        "reason": pair["reason"],
+                    }
+                    for pair in existing_pairs
+                ]
+
                 deleted_pair = current_pairs.pop(selected_index)
 
                 df = rewrite_pairs_to_row(df, row_index, current_pairs)
                 save_df(df)
 
-                st.success(f"削除しました：{kanji} → {deleted_pair[0]}, {deleted_pair[1]}")
+                st.success(f"削除しました：{kanji} → {deleted_pair['part1']}, {deleted_pair['part2']}")
                 st.rerun()
 
         # =========================
@@ -337,6 +447,7 @@ if kanji:
                 st.rerun()
             else:
                 st.error("削除するには確認チェックを入れてください。")
+
 
 # =========================
 # データ全体表示
