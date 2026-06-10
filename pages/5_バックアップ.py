@@ -30,6 +30,8 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
+original_df = df.copy(deep=True)
+
 st.success("Googleスプレッドシートからデータを読み込みました。")
 st.write(f"現在の登録行数：{len(df)} 件")
 st.dataframe(df, use_container_width=True, hide_index=True)
@@ -115,7 +117,7 @@ else:
                     st.error("復元するには確認チェックを入れてください。")
                 else:
                     try:
-                        save_df_to_sheet(auto_restore_df)
+                        save_df_to_sheet(auto_restore_df, expected_before_df=original_df)
                         st.success("自動バックアップから復元しました。")
                         st.rerun()
                     except Exception as e:
@@ -184,7 +186,7 @@ if uploaded_file is not None:
                 st.error("復元するには確認チェックを入れてください。")
             else:
                 try:
-                    save_df_to_sheet(restore_df)
+                    save_df_to_sheet(restore_df, expected_before_df=original_df)
                     st.success("Googleスプレッドシートへ復元しました。")
                     st.rerun()
                 except Exception as e:

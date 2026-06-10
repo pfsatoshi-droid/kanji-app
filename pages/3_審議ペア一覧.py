@@ -24,6 +24,8 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
+original_df = df.copy(deep=True)
+
 if "漢字" not in df.columns:
     st.error("データベースに『漢字』列がありません。")
     st.stop()
@@ -105,7 +107,7 @@ def build_review_pairs_df(df):
 
 def save_df(df):
     try:
-        save_df_to_sheet(df)
+        return save_df_to_sheet(df, expected_before_df=original_df)
     except Exception as e:
         st.error("Googleスプレッドシートへの保存に失敗しました。")
         st.exception(e)

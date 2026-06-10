@@ -16,6 +16,8 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
+original_df = df.copy(deep=True)
+
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
     if col not in df.columns:
@@ -46,7 +48,7 @@ def save_df(df):
     df = df[ordered_cols]
 
     try:
-        save_df_to_sheet(df)
+        return save_df_to_sheet(df, expected_before_df=original_df)
     except Exception as e:
         st.error("Googleスプレッドシートへの保存に失敗しました。")
         st.exception(e)

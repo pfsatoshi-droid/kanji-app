@@ -28,6 +28,10 @@ AUTO_BACKUP_PREFIX = "auto_backup_"
 AUTO_BACKUP_KEEP_COUNT = 10
 
 
+class StaleSheetError(Exception):
+    pass
+
+
 def now_jst_string():
     jst = timezone(timedelta(hours=9))
     return datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
@@ -178,6 +182,29 @@ def load_auto_backup_df(worksheet_title):
     return df.astype(str).fillna("")
 
 
+def normalize_df_for_compare(df, columns=None):
+    df = df.copy().astype(str).fillna("")
+
+    if columns is None:
+        columns = sorted(df.columns.tolist())
+    else:
+        columns = sorted(columns)
+
+    for col in columns:
+        if col not in df.columns:
+            df[col] = ""
+
+    return df[columns].reset_index(drop=True)
+
+
+def dataframes_equal(left_df, right_df):
+    columns = set(left_df.columns) | set(right_df.columns)
+    left_df = normalize_df_for_compare(left_df, columns)
+    right_df = normalize_df_for_compare(right_df, columns)
+
+    return left_df.equals(right_df)
+
+
 @st.cache_data(ttl=10)
 def load_df():
     worksheet = get_worksheet()
@@ -321,7 +348,7 @@ def append_history(records):
     st.cache_data.clear()
 
 
-def save_df_to_sheet(df):
+def save_df_to_sheet(df, expected_before_df=None):
     worksheet = get_worksheet()
 
     df = df.astype(str).fillna("")
@@ -333,6 +360,16 @@ def save_df_to_sheet(df):
         before_df = before_df.astype(str).fillna("")
     except Exception:
         before_df = pd.DataFrame(columns=df.columns)
+
+    if expected_before_df is not None and not dataframes_equal(before_df, expected_before_df):
+        raise StaleSheetError(
+            "読み込み後にGoogleスプレッドシートが変更されています。"
+            "上書き事故を防ぐため保存を中止しました。ページを再読み込みしてから、もう一度編集してください。"
+        )
+
+    if dataframes_equal(before_df, df):
+        st.cache_data.clear()
+        return False
 
     history_records = make_history_records(before_df, df)
 
@@ -346,3 +383,5 @@ def save_df_to_sheet(df):
     append_history(history_records)
 
     st.cache_data.clear()
+
+    return True
