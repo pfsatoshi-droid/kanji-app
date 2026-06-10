@@ -1,7 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from data_store import load_df, save_df_to_sheet
+from data_store import (
+    load_auto_backup_df,
+    load_df,
+    list_auto_backup_worksheets,
+    save_df_to_sheet,
+)
 
 st.set_page_config(page_title="漢字DB バックアップアプリ", layout="wide")
 
@@ -59,6 +64,67 @@ with col2:
     )
 
 st.caption("通常はTSVがおすすめです。Excelで扱いたい場合はCSVでもOKです。")
+
+# =========================
+# 自動バックアップから復元
+# =========================
+st.divider()
+st.subheader("自動バックアップから復元")
+
+st.write(
+    "編集・取り込み・削除などで保存するたびに、保存直前のデータが自動バックアップとして残ります。"
+    "直近のバックアップから選んで復元できます。"
+)
+
+try:
+    backup_worksheets = list_auto_backup_worksheets()
+except Exception as e:
+    st.error("自動バックアップ一覧の読み込みに失敗しました。")
+    st.exception(e)
+    backup_worksheets = []
+
+if not backup_worksheets:
+    st.info("自動バックアップはまだありません。")
+else:
+    backup_titles = [worksheet.title for worksheet in backup_worksheets]
+    selected_backup_title = st.selectbox(
+        "復元する自動バックアップ",
+        backup_titles,
+    )
+
+    try:
+        auto_restore_df = load_auto_backup_df(selected_backup_title)
+
+        st.write("復元予定データのプレビュー")
+        st.write(f"復元予定の行数：{len(auto_restore_df)} 件")
+        st.dataframe(auto_restore_df.head(50), use_container_width=True, hide_index=True)
+
+        required_cols = ["漢字", "画数", "漢検級", "メモ"]
+        missing_cols = [c for c in required_cols if c not in auto_restore_df.columns]
+
+        if missing_cols:
+            st.error(f"必要な列がありません：{', '.join(missing_cols)}")
+        else:
+            confirm_auto_restore = st.checkbox(
+                "現在のGoogleスプレッドシートを、この自動バックアップの内容で上書きすることを確認しました",
+                key="confirm_auto_restore",
+            )
+
+            if st.button("この自動バックアップから復元", type="primary"):
+                if not confirm_auto_restore:
+                    st.error("復元するには確認チェックを入れてください。")
+                else:
+                    try:
+                        save_df_to_sheet(auto_restore_df)
+                        st.success("自動バックアップから復元しました。")
+                        st.rerun()
+                    except Exception as e:
+                        st.error("自動バックアップからの復元に失敗しました。")
+                        st.exception(e)
+
+    except Exception as e:
+        st.error("選択した自動バックアップの読み込みに失敗しました。")
+        st.exception(e)
 
 # =========================
 # バックアップから復元

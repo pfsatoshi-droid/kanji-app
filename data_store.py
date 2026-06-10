@@ -24,10 +24,31 @@ HISTORY_COLUMNS = [
     "after",
 ]
 
+AUTO_BACKUP_PREFIX = "auto_backup_"
+AUTO_BACKUP_KEEP_COUNT = 10
+
 
 def now_jst_string():
     jst = timezone(timedelta(hours=9))
     return datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def now_jst_backup_name():
+    jst = timezone(timedelta(hours=9))
+    return datetime.now(jst).strftime("%Y%m%d_%H%M%S")
+
+
+def get_auto_backup_prefix():
+    return st.secrets.get("auto_backup_sheet_prefix", AUTO_BACKUP_PREFIX)
+
+
+def get_auto_backup_keep_count():
+    try:
+        keep_count = int(st.secrets.get("auto_backup_keep_count", AUTO_BACKUP_KEEP_COUNT))
+    except Exception:
+        keep_count = AUTO_BACKUP_KEEP_COUNT
+
+    return max(1, keep_count)
 
 
 def get_spreadsheet():
@@ -71,6 +92,90 @@ def get_history_worksheet():
         worksheet.update([HISTORY_COLUMNS])
 
     return worksheet
+
+
+def list_auto_backup_worksheets():
+    spreadsheet = get_spreadsheet()
+    prefix = get_auto_backup_prefix()
+
+    backups = [
+        worksheet
+        for worksheet in spreadsheet.worksheets()
+        if worksheet.title.startswith(prefix)
+    ]
+
+    return sorted(backups, key=lambda worksheet: worksheet.title, reverse=True)
+
+
+def get_unique_backup_title(spreadsheet, base_title):
+    existing_titles = {worksheet.title for worksheet in spreadsheet.worksheets()}
+
+    if base_title not in existing_titles:
+        return base_title
+
+    counter = 2
+    while True:
+        title = f"{base_title}_{counter}"
+        if title not in existing_titles:
+            return title
+        counter += 1
+
+
+def trim_auto_backups(spreadsheet):
+    keep_count = get_auto_backup_keep_count()
+    prefix = get_auto_backup_prefix()
+
+    backups = [
+        worksheet
+        for worksheet in spreadsheet.worksheets()
+        if worksheet.title.startswith(prefix)
+    ]
+    backups = sorted(backups, key=lambda worksheet: worksheet.title, reverse=True)
+
+    for worksheet in backups[keep_count:]:
+        spreadsheet.del_worksheet(worksheet)
+
+
+def create_auto_backup(df):
+    df = df.astype(str).fillna("")
+
+    if df.empty and len(df.columns) == 0:
+        return None
+
+    spreadsheet = get_spreadsheet()
+    base_title = f"{get_auto_backup_prefix()}{now_jst_backup_name()}"
+    title = get_unique_backup_title(spreadsheet, base_title)
+
+    rows = max(len(df) + 1, 1)
+    cols = max(len(df.columns), 1)
+    worksheet = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
+
+    values = [df.columns.tolist()] + df.values.tolist()
+    if values:
+        worksheet.update(values)
+
+    trim_auto_backups(spreadsheet)
+
+    return title
+
+
+def load_auto_backup_df(worksheet_title):
+    spreadsheet = get_spreadsheet()
+    prefix = get_auto_backup_prefix()
+
+    if not worksheet_title.startswith(prefix):
+        raise ValueError("自動バックアップではないシート名です。")
+
+    worksheet = spreadsheet.worksheet(worksheet_title)
+    records = worksheet.get_all_records()
+
+    if records:
+        df = pd.DataFrame(records)
+    else:
+        header = worksheet.row_values(1)
+        df = pd.DataFrame(columns=header)
+
+    return df.astype(str).fillna("")
 
 
 @st.cache_data(ttl=10)
@@ -232,6 +337,8 @@ def save_df_to_sheet(df):
     history_records = make_history_records(before_df, df)
 
     values = [df.columns.tolist()] + df.values.tolist()
+
+    create_auto_backup(before_df)
 
     worksheet.clear()
     worksheet.update(values)
