@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
+from ui_helpers import set_flash, show_database_status, show_flash
 
 st.set_page_config(page_title="審議ペア一覧", layout="wide")
 
 st.title("審議ペア一覧")
+show_flash()
 
 st.write(
     """
@@ -25,6 +27,7 @@ except Exception as e:
     st.stop()
 
 original_df = df.copy(deep=True)
+show_database_status(df)
 
 if "漢字" not in df.columns:
     st.error("データベースに『漢字』列がありません。")
@@ -115,8 +118,6 @@ def save_df(df):
 
 
 review_df = build_review_pairs_df(df)
-
-st.success(f"読み込み完了：登録行数 {len(df)} 件")
 
 st.divider()
 
@@ -231,7 +232,7 @@ else:
 
         save_df(df)
 
-        st.success("審議を解除しました。")
+        set_flash("審議を解除しました。")
         st.rerun()
 
 

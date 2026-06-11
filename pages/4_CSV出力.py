@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from data_store import load_df
+from ui_helpers import show_database_status
 
 st.set_page_config(page_title="CSVに変換", layout="wide")
 
@@ -23,7 +24,7 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
-st.success(f"Googleスプレッドシートを読み込みました。行数：{len(df)} 件")
+show_database_status(df)
 
 st.subheader("変換前プレビュー")
 st.dataframe(df.head(20), use_container_width=True, hide_index=True)

@@ -3,10 +3,12 @@ import pandas as pd
 import re
 from datetime import datetime
 from data_store import load_df, save_df_to_sheet
+from ui_helpers import set_flash, show_change_summary, show_database_status, show_flash
 
 st.set_page_config(page_title="漢字行 削除アプリ", layout="wide")
 
 st.title("漢字行 削除アプリ")
+show_flash()
 
 # =========================
 # データ読み込み
@@ -19,6 +21,7 @@ except Exception as e:
     st.stop()
 
 original_df = df.copy(deep=True)
+show_database_status(df)
 
 if "漢字" not in df.columns:
     st.error("Googleスプレッドシートに『漢字』列がありません。")
@@ -339,6 +342,9 @@ if target_indices:
 
     st.error("削除すると、対象漢字の画数・漢検級・メモ・部品ペアがすべて消えます。")
 
+    preview_after_delete_df = df.drop(index=sorted_indices).reset_index(drop=True)
+    show_change_summary(df, preview_after_delete_df, title="削除によるDB変更")
+
     confirm_text = st.text_input(
         "削除を実行するには DELETE と入力してください"
     )
@@ -372,7 +378,7 @@ if target_indices:
 
             save_df(df_after)
 
-            st.success(f"{deleted_count} 行をGoogleスプレッドシートから削除しました。")
+            set_flash(f"{deleted_count} 行をGoogleスプレッドシートから削除しました。")
 
             st.rerun()
 

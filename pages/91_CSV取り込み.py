@@ -2,10 +2,12 @@ import re
 import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
+from ui_helpers import set_flash, show_change_summary, show_database_status, show_flash
 
 st.set_page_config(page_title="漢字ペア CSV取り込みアプリ", layout="wide")
 
 st.title("漢字ペア CSV取り込みアプリ")
+show_flash()
 
 # =========================
 # メインDB読み込み
@@ -18,6 +20,7 @@ except Exception as e:
     st.stop()
 
 original_df = df.copy(deep=True)
+show_database_status(df)
 
 # 必要な基本列を追加
 for col in ["漢字", "画数", "漢検級", "メモ"]:
@@ -144,6 +147,112 @@ def detect_pair_numbers(columns):
     return sorted(nums)
 
 
+def build_import_result(
+    source_df,
+    import_df,
+    kanji_col,
+    pair_nums,
+    overwrite_pairs,
+    skip_duplicates,
+    overwrite_info,
+):
+    result_df = source_df.copy()
+    added_kanji_count = 0
+    added_pair_count = 0
+    replaced_kanji_count = 0
+    skipped_pair_count = 0
+    skipped_row_count = 0
+    updated_info_count = 0
+
+    for _, import_row in import_df.iterrows():
+        k = str(import_row.get(kanji_col, "")).strip()
+
+        if k == "" or len(k) != 1:
+            skipped_row_count += 1
+            continue
+
+        imported_pairs = []
+
+        for n in pair_nums:
+            p1_col = f"ペア{n}_部品1"
+            p2_col = f"ペア{n}_部品2"
+
+            p1 = str(import_row.get(p1_col, "")).strip()
+            p2 = str(import_row.get(p2_col, "")).strip()
+
+            if p1 == "" and p2 == "":
+                continue
+
+            if p1 == "" or p2 == "":
+                skipped_row_count += 1
+                continue
+
+            imported_pairs.append((p1, p2))
+
+        matched = result_df[result_df["漢字"] == k]
+
+        if not matched.empty:
+            row_index = matched.index[0]
+            current_pairs = get_pairs_from_row(result_df.loc[row_index], result_df)
+        else:
+            new_row = {
+                "漢字": k,
+                "画数": "",
+                "漢検級": "",
+                "メモ": "",
+            }
+            result_df = pd.concat([result_df, pd.DataFrame([new_row])], ignore_index=True)
+            row_index = result_df.index[-1]
+            current_pairs = []
+            added_kanji_count += 1
+
+        if overwrite_info:
+            changed = False
+
+            for col_name in ["画数", "漢検級", "メモ"]:
+                if col_name in import_df.columns:
+                    value = str(import_row.get(col_name, "")).strip()
+                    if value != "":
+                        result_df.loc[row_index, col_name] = value
+                        changed = True
+
+            if changed:
+                updated_info_count += 1
+
+        if overwrite_pairs:
+            new_pairs = []
+            for pair in imported_pairs:
+                if pair not in new_pairs:
+                    new_pairs.append(pair)
+
+            result_df = rewrite_pairs_to_row(result_df, row_index, new_pairs)
+            added_pair_count += len(new_pairs)
+            replaced_kanji_count += 1
+        else:
+            new_pairs = current_pairs.copy()
+
+            for pair in imported_pairs:
+                if skip_duplicates and pair in new_pairs:
+                    skipped_pair_count += 1
+                    continue
+
+                new_pairs.append(pair)
+                added_pair_count += 1
+
+            result_df = rewrite_pairs_to_row(result_df, row_index, new_pairs)
+
+    stats = {
+        "新規漢字": added_kanji_count,
+        "追加ペア": added_pair_count,
+        "置き換えた漢字": replaced_kanji_count,
+        "重複スキップ": skipped_pair_count,
+        "行・不完全ペアのスキップ": skipped_row_count,
+        "漢字情報更新": updated_info_count,
+    }
+
+    return result_df, stats
+
+
 # =========================
 # CSVアップロード
 # =========================
@@ -203,109 +312,37 @@ if uploaded_file is not None:
             "安全に取り込むなら、最初は「既存のペアを消して置き換える」はOFFのままがおすすめです。"
         )
 
-        execute = st.button("このCSVを取り込む", type="primary", disabled=not bool(pair_nums))
+        if pair_nums:
+            result_df, stats = build_import_result(
+                df,
+                import_df,
+                kanji_col,
+                pair_nums,
+                overwrite_pairs,
+                skip_duplicates,
+                overwrite_info,
+            )
 
-        if execute:
-            added_kanji_count = 0
-            added_pair_count = 0
-            replaced_kanji_count = 0
-            skipped_pair_count = 0
-            skipped_row_count = 0
-            updated_info_count = 0
+            st.divider()
+            st.subheader("取り込み前の確認")
 
-            for _, import_row in import_df.iterrows():
-                k = str(import_row.get(kanji_col, "")).strip()
+            stat_cols = st.columns(3)
+            for index, (label, value) in enumerate(stats.items()):
+                with stat_cols[index % 3]:
+                    st.metric(label, value)
 
-                if k == "" or len(k) != 1:
-                    skipped_row_count += 1
-                    continue
+            show_change_summary(df, result_df, title="取り込みによるDB変更")
 
-                # CSV側のペアを抽出
-                imported_pairs = []
+            execute = st.button("この内容でCSVを取り込む", type="primary")
 
-                for n in pair_nums:
-                    p1_col = f"ペア{n}_部品1"
-                    p2_col = f"ペア{n}_部品2"
-
-                    p1 = str(import_row.get(p1_col, "")).strip()
-                    p2 = str(import_row.get(p2_col, "")).strip()
-
-                    # 両方空なら無視
-                    if p1 == "" and p2 == "":
-                        continue
-
-                    # 片方だけ空のものは不完全なので無視
-                    if p1 == "" or p2 == "":
-                        skipped_row_count += 1
-                        continue
-
-                    imported_pairs.append((p1, p2))
-
-                matched = df[df["漢字"] == k]
-
-                if not matched.empty:
-                    row_index = matched.index[0]
-                    current_pairs = get_pairs_from_row(df.loc[row_index], df)
-                else:
-                    new_row = {
-                        "漢字": k,
-                        "画数": "",
-                        "漢検級": "",
-                        "メモ": "",
-                    }
-                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                    row_index = df.index[-1]
-                    current_pairs = []
-                    added_kanji_count += 1
-
-                # 画数・漢検級・メモを必要に応じて取り込む
-                if overwrite_info:
-                    changed = False
-
-                    for col_name in ["画数", "漢検級", "メモ"]:
-                        if col_name in import_df.columns:
-                            value = str(import_row.get(col_name, "")).strip()
-                            if value != "":
-                                df.loc[row_index, col_name] = value
-                                changed = True
-
-                    if changed:
-                        updated_info_count += 1
-
-                if overwrite_pairs:
-                    new_pairs = []
-                    for pair in imported_pairs:
-                        if pair not in new_pairs:
-                            new_pairs.append(pair)
-
-                    df = rewrite_pairs_to_row(df, row_index, new_pairs)
-                    added_pair_count += len(new_pairs)
-                    replaced_kanji_count += 1
-
-                else:
-                    new_pairs = current_pairs.copy()
-
-                    for pair in imported_pairs:
-                        if skip_duplicates and pair in new_pairs:
-                            skipped_pair_count += 1
-                            continue
-
-                        new_pairs.append(pair)
-                        added_pair_count += 1
-
-                    df = rewrite_pairs_to_row(df, row_index, new_pairs)
-
-            save_df(df)
-
-            st.success("取り込みが完了しました。")
-            st.write(f"新規漢字：{added_kanji_count} 件")
-            st.write(f"追加ペア：{added_pair_count} 件")
-            st.write(f"置き換えた漢字：{replaced_kanji_count} 件")
-            st.write(f"重複スキップ：{skipped_pair_count} 件")
-            st.write(f"行・不完全ペアのスキップ：{skipped_row_count} 件")
-            st.write(f"漢字情報更新：{updated_info_count} 件")
-
-            st.rerun()
+            if execute:
+                save_df(result_df)
+                set_flash(
+                    "CSV取り込みが完了しました。"
+                    f"新規漢字：{stats['新規漢字']}件、追加ペア：{stats['追加ペア']}件、"
+                    f"置き換えた漢字：{stats['置き換えた漢字']}件"
+                )
+                st.rerun()
 
     except Exception as e:
         st.error("CSVの読み込み・取り込み中にエラーが起きました。")

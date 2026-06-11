@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df
+from ui_helpers import show_database_status
 
 st.set_page_config(page_title="漢字リスト照合アプリ", layout="wide")
 
@@ -31,7 +32,7 @@ registered_kanji_list = (
 registered_kanji_list = [k for k in registered_kanji_list if k != ""]
 registered_kanji_set = set(registered_kanji_list)
 
-st.success(f"Googleスプレッドシートの登録漢字数：{len(registered_kanji_set)} 件")
+show_database_status(df)
 
 
 # =========================
@@ -180,11 +181,12 @@ if st.button("チェックする", type="primary"):
             st.warning("データベースに含まれていない漢字があります。")
 
             st.text_area(
-                "コピー用",
+                "一括追加に貼り付ける文字列",
                 value=make_copy_text(missing_chars),
                 height=120,
                 key="missing_copy"
             )
+            st.caption("この文字列を「一括追加」ページに貼り付けると、未登録漢字をまとめて追加できます。")
 
             if show_location:
                 missing_df = pd.DataFrame(missing_records)

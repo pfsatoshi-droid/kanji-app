@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
+from ui_helpers import set_flash, show_database_status, show_flash
 
 st.set_page_config(page_title="漢字編集・検索", layout="wide")
 
 st.title("漢字編集・検索")
+show_flash()
 
 
 # =========================
@@ -18,6 +20,7 @@ except Exception as e:
     st.stop()
 
 original_df = df.copy(deep=True)
+show_database_status(df)
 
 
 # 必要な基本列を追加
@@ -266,7 +269,7 @@ with tab_edit:
                 df.loc[row_index, "メモ"] = memo
 
             save_df(df)
-            st.success(f"{kanji} の情報をGoogleスプレッドシートに保存しました。")
+            set_flash(f"{kanji} の情報をGoogleスプレッドシートに保存しました。")
             st.rerun()
 
         # =========================
@@ -349,9 +352,9 @@ with tab_edit:
                     save_df(df)
 
                     if add_review:
-                        st.success(f"審議対象として追加しました：{kanji} → {add_part1}, {add_part2}")
+                        set_flash(f"審議対象として追加しました：{kanji} → {add_part1}, {add_part2}")
                     else:
-                        st.success(f"追加しました：{kanji} → {add_part1}, {add_part2}")
+                        set_flash(f"追加しました：{kanji} → {add_part1}, {add_part2}")
 
                     st.rerun()
 
@@ -428,7 +431,7 @@ with tab_edit:
                         else:
                             df = rewrite_pairs_to_row(df, row_index, current_pairs)
                             save_df(df)
-                            st.success(f"更新しました：{kanji} → {edit_part1}, {edit_part2}")
+                            set_flash(f"更新しました：{kanji} → {edit_part1}, {edit_part2}")
                             st.rerun()
 
             with col2:
@@ -448,7 +451,7 @@ with tab_edit:
                     df = rewrite_pairs_to_row(df, row_index, current_pairs)
                     save_df(df)
 
-                    st.success(f"削除しました：{kanji} → {deleted_pair['part1']}, {deleted_pair['part2']}")
+                    set_flash(f"削除しました：{kanji} → {deleted_pair['part1']}, {deleted_pair['part2']}")
                     st.rerun()
 
             # =========================
@@ -463,7 +466,7 @@ with tab_edit:
                     if confirm_delete:
                         df = df.drop(index=row_index).reset_index(drop=True)
                         save_df(df)
-                        st.success(f"{kanji} の行を削除しました。")
+                        set_flash(f"{kanji} の行を削除しました。")
                         st.rerun()
                     else:
                         st.error("削除するには確認チェックを入れてください。")

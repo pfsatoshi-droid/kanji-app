@@ -7,10 +7,12 @@ from data_store import (
     list_auto_backup_worksheets,
     save_df_to_sheet,
 )
+from ui_helpers import set_flash, show_change_summary, show_database_status, show_flash
 
 st.set_page_config(page_title="漢字DB バックアップアプリ", layout="wide")
 
 st.title("漢字DB バックアップアプリ")
+show_flash()
 
 st.info(
     "現在は Googleスプレッドシートをデータ保存先にしています。"
@@ -33,7 +35,7 @@ except Exception as e:
 original_df = df.copy(deep=True)
 
 st.success("Googleスプレッドシートからデータを読み込みました。")
-st.write(f"現在の登録行数：{len(df)} 件")
+show_database_status(df)
 st.dataframe(df, use_container_width=True, hide_index=True)
 
 # =========================
@@ -100,6 +102,7 @@ else:
         st.write("復元予定データのプレビュー")
         st.write(f"復元予定の行数：{len(auto_restore_df)} 件")
         st.dataframe(auto_restore_df.head(50), use_container_width=True, hide_index=True)
+        show_change_summary(df, auto_restore_df, title="復元によるDB変更")
 
         required_cols = ["漢字", "画数", "漢検級", "メモ"]
         missing_cols = [c for c in required_cols if c not in auto_restore_df.columns]
@@ -118,7 +121,7 @@ else:
                 else:
                     try:
                         save_df_to_sheet(auto_restore_df, expected_before_df=original_df)
-                        st.success("自動バックアップから復元しました。")
+                        set_flash("自動バックアップから復元しました。")
                         st.rerun()
                     except Exception as e:
                         st.error("自動バックアップからの復元に失敗しました。")
@@ -169,6 +172,7 @@ if uploaded_file is not None:
         st.write("復元予定データのプレビュー")
         st.write(f"復元予定の行数：{len(restore_df)} 件")
         st.dataframe(restore_df.head(50), use_container_width=True, hide_index=True)
+        show_change_summary(df, restore_df, title="復元によるDB変更")
 
         required_cols = ["漢字", "画数", "漢検級", "メモ"]
         missing_cols = [c for c in required_cols if c not in restore_df.columns]
@@ -187,7 +191,7 @@ if uploaded_file is not None:
             else:
                 try:
                     save_df_to_sheet(restore_df, expected_before_df=original_df)
-                    st.success("Googleスプレッドシートへ復元しました。")
+                    set_flash("Googleスプレッドシートへ復元しました。")
                     st.rerun()
                 except Exception as e:
                     st.error("Googleスプレッドシートへの復元に失敗しました。")

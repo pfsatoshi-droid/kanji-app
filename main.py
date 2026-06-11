@@ -1,9 +1,11 @@
 import streamlit as st
 from data_store import load_df
+from ui_helpers import show_database_status, show_flash
 
 st.set_page_config(page_title="漢字データベース管理アプリ", layout="wide")
 
 st.title("漢字データベース管理アプリ")
+show_flash()
 
 st.write(
     """
@@ -21,7 +23,7 @@ try:
     df = load_df()
 
     st.success("Googleスプレッドシートからデータを読み込みました。")
-    st.write(f"登録行数：{len(df)} 件")
+    show_database_status(df)
 
     if "漢字" in df.columns:
         registered_count = df["漢字"].dropna().astype(str).str.strip()

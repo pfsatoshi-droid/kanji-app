@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df
+from ui_helpers import show_database_status
 
 st.set_page_config(page_title="部品ランキング・逆引き", layout="wide")
 
@@ -27,7 +28,7 @@ if "漢字" not in df.columns:
     st.error("データベースに『漢字』列がありません。")
     st.stop()
 
-st.success(f"Googleスプレッドシートを読み込みました。登録行数：{len(df)} 件")
+show_database_status(df)
 
 
 # =========================

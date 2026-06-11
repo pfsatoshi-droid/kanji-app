@@ -28,7 +28,14 @@ for col in ["timestamp", "action", "kanji", "field", "before", "after"]:
     if col not in history_df.columns:
         history_df[col] = ""
 
-st.success(f"履歴件数：{len(history_df)} 件")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("履歴件数", len(history_df))
+with col2:
+    st.metric("対象漢字数", history_df["kanji"].astype(str).str.strip().replace("", pd.NA).dropna().nunique())
+with col3:
+    st.metric("操作種類", history_df["action"].astype(str).str.strip().replace("", pd.NA).dropna().nunique())
 
 st.divider()
 
