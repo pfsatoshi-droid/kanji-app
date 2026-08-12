@@ -2,6 +2,13 @@ import re
 import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
+from pair_utils import (
+    ensure_pair_columns,
+    get_pair_numbers,
+    normalize_legacy_columns,
+    pair_key,
+    validate_parts,
+)
 
 st.set_page_config(page_title="漢字ペア CSV取り込みアプリ", layout="wide")
 
@@ -22,64 +29,41 @@ for col in ["漢字", "画数", "漢検級", "メモ"]:
     if col not in df.columns:
         df[col] = ""
 
-# 古い形式「部品1」「部品2」がある場合、ペア1に変換
-if "部品1" in df.columns and "部品2" in df.columns:
-    if "ペア1_部品1" not in df.columns:
-        df["ペア1_部品1"] = df["部品1"]
-    if "ペア1_部品2" not in df.columns:
-        df["ペア1_部品2"] = df["部品2"]
-    df = df.drop(columns=["部品1", "部品2"])
+df = normalize_legacy_columns(df)
 
 
 # =========================
 # 便利関数
 # =========================
-def get_pair_numbers(df):
-    nums = []
-    for col in df.columns:
-        if col.startswith("ペア") and col.endswith("_部品1"):
-            num = col.replace("ペア", "").replace("_部品1", "")
-            if num.isdigit():
-                nums.append(int(num))
-    return sorted(nums)
-
-
-def ensure_pair_columns(df, pair_num):
-    col1 = f"ペア{pair_num}_部品1"
-    col2 = f"ペア{pair_num}_部品2"
-
-    if col1 not in df.columns:
-        df[col1] = ""
-    if col2 not in df.columns:
-        df[col2] = ""
-
-    return df
-
-
 def get_pairs_from_row(row, df):
     pairs = []
     for n in get_pair_numbers(df):
         p1 = str(row.get(f"ペア{n}_部品1", "")).strip()
         p2 = str(row.get(f"ペア{n}_部品2", "")).strip()
-        if p1 != "" or p2 != "":
-            pairs.append((p1, p2))
+        p3 = str(row.get(f"ペア{n}_部品3", "")).strip()
+        if p1 != "" or p2 != "" or p3 != "":
+            pairs.append((p1, p2, p3))
     return pairs
 
 
 def rewrite_pairs_to_row(df, row_index, pairs):
     """
-    pairs は [(部品1, 部品2), ...] の形。
+    pairs は [(部品1, 部品2, 部品3), ...] の形。部品3は空欄可。
     既存のペア列をいったん空にして、ペア1から詰め直す。
     """
 
     for n in get_pair_numbers(df):
+        df = ensure_pair_columns(df, n)
         df.loc[row_index, f"ペア{n}_部品1"] = ""
         df.loc[row_index, f"ペア{n}_部品2"] = ""
+        df.loc[row_index, f"ペア{n}_部品3"] = ""
 
-    for i, (p1, p2) in enumerate(pairs, start=1):
+    for i, pair in enumerate(pairs, start=1):
+        p1, p2, p3 = pair_key(pair)
         df = ensure_pair_columns(df, i)
         df.loc[row_index, f"ペア{i}_部品1"] = p1
         df.loc[row_index, f"ペア{i}_部品2"] = p2
+        df.loc[row_index, f"ペア{i}_部品3"] = p3
 
     return df
 
@@ -91,6 +75,7 @@ def save_df(df):
     for n in get_pair_numbers(df):
         pair_cols.append(f"ペア{n}_部品1")
         pair_cols.append(f"ペア{n}_部品2")
+        pair_cols.append(f"ペア{n}_部品3")
 
     other_cols = [c for c in df.columns if c not in base_cols + pair_cols]
     ordered_cols = base_cols + pair_cols + other_cols
@@ -132,7 +117,7 @@ def detect_pair_numbers(columns):
 
     for col in columns:
         m1 = re.match(r"ペア(\d+)_部品1", col)
-        m2 = re.match(r"ペア(\d+)_部品2", col)
+        m2 = re.match(r"ペア(\d+)_部品[23]", col)
 
         if m1:
             nums.add(int(m1.group(1)))
@@ -152,7 +137,7 @@ uploaded_file = st.file_uploader(
     type=["csv"]
 )
 
-st.caption("対応形式：漢字, ペア1_部品1, ペア1_部品2, ペア2_部品1, ペア2_部品2, ...")
+st.caption("対応形式：漢字, ペア1_部品1, ペア1_部品2, ペア1_部品3（任意）, ...")
 
 if uploaded_file is not None:
     try:
@@ -224,20 +209,22 @@ if uploaded_file is not None:
                 for n in pair_nums:
                     p1_col = f"ペア{n}_部品1"
                     p2_col = f"ペア{n}_部品2"
+                    p3_col = f"ペア{n}_部品3"
 
-                    p1 = str(import_row.get(p1_col, "")).strip()
-                    p2 = str(import_row.get(p2_col, "")).strip()
-
-                    # 両方空なら無視
-                    if p1 == "" and p2 == "":
+                    raw_parts = pair_key((
+                        import_row.get(p1_col, ""),
+                        import_row.get(p2_col, ""),
+                        import_row.get(p3_col, ""),
+                    ))
+                    if raw_parts == ("", "", ""):
                         continue
 
-                    # 片方だけ空のものは不完全なので無視
-                    if p1 == "" or p2 == "":
+                    parts, validation_error = validate_parts(*raw_parts)
+                    if validation_error:
                         skipped_row_count += 1
                         continue
 
-                    imported_pairs.append((p1, p2))
+                    imported_pairs.append(parts)
 
                 matched = df[df["漢字"] == k]
 

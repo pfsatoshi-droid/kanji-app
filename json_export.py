@@ -19,7 +19,7 @@ LEVEL_NUMBERS = {
     "1級": -1,
 }
 
-PAIR_COLUMN_PATTERN = re.compile(r"^ペア(\d+)_部品([12])$")
+PAIR_COLUMN_PATTERN = re.compile(r"^ペア(\d+)_部品([123])$")
 
 
 def level_to_number(level):
@@ -49,7 +49,7 @@ def find_pair_numbers(columns):
             pair_number = int(match.group(1))
             found.setdefault(pair_number, set()).add(int(match.group(2)))
 
-    return sorted(number for number, sides in found.items() if sides == {1, 2})
+    return sorted(number for number, sides in found.items() if {1, 2}.issubset(sides))
 
 
 def build_kanji_database(df):
@@ -62,7 +62,7 @@ def build_kanji_database(df):
     if "漢字" not in df.columns:
         raise ValueError("「漢字」列が見つかりません。")
 
-    working_df = df.astype(str).fillna("").copy()
+    working_df = df.fillna("").astype(str).copy()
     working_df["漢字"] = working_df["漢字"].str.strip()
     working_df = working_df[working_df["漢字"] != ""]
     working_df = working_df.drop_duplicates(subset=["漢字"], keep="first")
@@ -79,8 +79,12 @@ def build_kanji_database(df):
         for pair_number in pair_numbers:
             first = str(row.get(f"ペア{pair_number}_部品1", "")).strip()
             second = str(row.get(f"ペア{pair_number}_部品2", "")).strip()
+            third = str(row.get(f"ペア{pair_number}_部品3", "")).strip()
 
             if not first or not second:
+                continue
+            # 現行ゲームJSONは2項変換のため、3部品分解を誤って2部品として出力しない。
+            if third:
                 continue
             if first not in registered_kanji or second not in registered_kanji:
                 continue

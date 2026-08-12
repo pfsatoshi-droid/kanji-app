@@ -39,6 +39,8 @@ def save_df(df):
     for n in get_pair_numbers(df):
         pair_cols.append(f"ペア{n}_部品1")
         pair_cols.append(f"ペア{n}_部品2")
+        if f"ペア{n}_部品3" in df.columns:
+            pair_cols.append(f"ペア{n}_部品3")
 
     other_cols = [c for c in df.columns if c not in base_cols + pair_cols]
     ordered_cols = base_cols + pair_cols + other_cols

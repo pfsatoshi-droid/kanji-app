@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df
+from pair_utils import get_pair_numbers
 
 st.set_page_config(page_title="部品ランキング・逆引き", layout="wide")
 
@@ -33,16 +34,6 @@ st.success(f"Googleスプレッドシートを読み込みました。登録行�
 # =========================
 # 便利関数
 # =========================
-def get_pair_numbers(df):
-    nums = []
-    for col in df.columns:
-        if col.startswith("ペア") and col.endswith("_部品1"):
-            num = col.replace("ペア", "").replace("_部品1", "")
-            if num.isdigit():
-                nums.append(int(num))
-    return sorted(nums)
-
-
 def build_parts_long_df(df):
     """
     横持ちのペア列を、部品ごとの縦持ちデータに変換する。
@@ -62,34 +53,19 @@ def build_parts_long_df(df):
         memo = str(row.get("メモ", "")).strip()
 
         for n in pair_nums:
-            p1_col = f"ペア{n}_部品1"
-            p2_col = f"ペア{n}_部品2"
+            parts = [str(row.get(f"ペア{n}_部品{position}", "")).strip() for position in (1, 2, 3)]
 
-            part1 = str(row.get(p1_col, "")).strip()
-            part2 = str(row.get(p2_col, "")).strip()
-
-            if part1 != "":
+            for position, part in enumerate(parts, start=1):
+                if part == "":
+                    continue
+                companions = "、".join(value for index, value in enumerate(parts) if index != position - 1 and value)
                 records.append(
                     {
-                        "部品": part1,
+                        "部品": part,
                         "漢字": kanji,
                         "ペア番号": n,
-                        "位置": "部品1",
-                        "相方部品": part2,
-                        "画数": strokes,
-                        "漢検級": kanken_level,
-                        "メモ": memo,
-                    }
-                )
-
-            if part2 != "":
-                records.append(
-                    {
-                        "部品": part2,
-                        "漢字": kanji,
-                        "ペア番号": n,
-                        "位置": "部品2",
-                        "相方部品": part1,
+                        "位置": f"部品{position}",
+                        "相方部品": companions,
                         "画数": strokes,
                         "漢検級": kanken_level,
                         "メモ": memo,

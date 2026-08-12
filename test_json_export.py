@@ -25,6 +25,10 @@ def test_find_pair_numbers_requires_both_sides():
     assert find_pair_numbers(["ペア2_部品2", "ペア1_部品1", "ペア1_部品2"]) == [1]
 
 
+def test_find_pair_numbers_accepts_optional_third_part():
+    assert find_pair_numbers(["ペア1_部品1", "ペア1_部品2", "ペア1_部品3"]) == [1]
+
+
 def test_builds_bidirectional_transforms_and_groups_results():
     result = build_kanji_database(sample_df())
     entries = {item["baseKanji"]: item for item in result["kanjiDatas"]}
@@ -49,3 +53,11 @@ def test_level_counts_down_for_pre_levels():
     assert [level_to_number(level) for level in [
         "3級", "準2級", "2級", "準1級", "1級"
     ]] == [3, 2, 1, 0, -1]
+
+
+def test_three_part_decomposition_is_not_misrepresented_as_binary_json():
+    df = sample_df()
+    df.loc[df["漢字"] == "百", "ペア1_部品3"] = "自"
+    result = build_kanji_database(df)
+    entries = {item["baseKanji"]: item for item in result["kanjiDatas"]}
+    assert entries["一"]["kanjiTransforms"] == [{"modifier": "白", "results": ["自"]}]

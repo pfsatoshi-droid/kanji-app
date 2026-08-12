@@ -137,7 +137,7 @@ def trim_auto_backups(spreadsheet):
 
 
 def create_auto_backup(df):
-    df = df.astype(str).fillna("")
+    df = df.fillna("").astype(str)
 
     if df.empty and len(df.columns) == 0:
         return None
@@ -175,7 +175,7 @@ def load_auto_backup_df(worksheet_title):
         header = worksheet.row_values(1)
         df = pd.DataFrame(columns=header)
 
-    return df.astype(str).fillna("")
+    return df.fillna("").astype(str)
 
 
 @st.cache_data(ttl=10)
@@ -188,7 +188,7 @@ def load_df():
     else:
         df = pd.DataFrame(columns=DEFAULT_COLUMNS)
 
-    df = df.astype(str).fillna("")
+    df = df.fillna("").astype(str)
 
     for col in DEFAULT_COLUMNS:
         if col not in df.columns:
@@ -207,7 +207,7 @@ def load_history_df():
     else:
         df = pd.DataFrame(columns=HISTORY_COLUMNS)
 
-    df = df.astype(str).fillna("")
+    df = df.fillna("").astype(str)
 
     for col in HISTORY_COLUMNS:
         if col not in df.columns:
@@ -239,8 +239,8 @@ def make_history_records(before_df, after_df):
     if "漢字" not in before_df.columns or "漢字" not in after_df.columns:
         return records
 
-    before_df = before_df.astype(str).fillna("")
-    after_df = after_df.astype(str).fillna("")
+    before_df = before_df.fillna("").astype(str)
+    after_df = after_df.fillna("").astype(str)
 
     before_df = before_df[before_df["漢字"].astype(str).str.strip() != ""].copy()
     after_df = after_df[after_df["漢字"].astype(str).str.strip() != ""].copy()
@@ -324,13 +324,13 @@ def append_history(records):
 def save_df_to_sheet(df):
     worksheet = get_worksheet()
 
-    df = df.astype(str).fillna("")
+    df = df.fillna("").astype(str)
 
     # 保存前の状態を取得して、差分から履歴を作る
     try:
         before_records = worksheet.get_all_records()
         before_df = pd.DataFrame(before_records) if before_records else pd.DataFrame(columns=df.columns)
-        before_df = before_df.astype(str).fillna("")
+        before_df = before_df.fillna("").astype(str)
     except Exception:
         before_df = pd.DataFrame(columns=df.columns)
 
