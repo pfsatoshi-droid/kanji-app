@@ -69,7 +69,7 @@ with quality_columns[0]:
     st.page_link("pages/3_審議ペア一覧.py", label="審議一覧を開く", icon="🔎", use_container_width=True)
 with quality_columns[1]:
     feature_card("漢字リスト照合", "外部リストとデータベースを比較し、過不足を見つけます。")
-    st.page_link("pages/92_漢字チェック.py", label="漢字チェックを開く", icon="✓", use_container_width=True)
+    st.page_link("pages/92_漢字チェック.py", label="漢字チェックを開く", icon="✅", use_container_width=True)
 with quality_columns[2]:
     feature_card("バックアップと履歴", "保存前の状態や過去の変更を確認し、安全に運用します。")
     st.page_link("pages/5_バックアップ.py", label="バックアップを開く", icon="🕘", use_container_width=True)
