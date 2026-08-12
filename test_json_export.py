@@ -4,8 +4,11 @@ import pandas as pd
 
 from json_export import (
     build_kanji_database,
+    build_kanji_database_v2,
     find_pair_numbers,
     level_to_number,
+    level_to_float,
+    stroke_count_to_int,
     to_json_text,
 )
 
@@ -61,3 +64,34 @@ def test_three_part_decomposition_is_not_misrepresented_as_binary_json():
     result = build_kanji_database(df)
     entries = {item["baseKanji"]: item for item in result["kanjiDatas"]}
     assert entries["一"]["kanjiTransforms"] == [{"modifier": "白", "results": ["自"]}]
+
+
+def test_v2_uses_float_levels_and_integer_stroke_count():
+    df = sample_df()
+    df["画数"] = ["1", "5", "6", "6"]
+    df.loc[df["漢字"] == "百", "漢検級"] = "準2級"
+    entries = {item["baseKanji"]: item for item in build_kanji_database_v2(df)["kanjiDatas"]}
+    assert entries["百"]["level"] == 2.5
+    assert isinstance(entries["百"]["level"], float)
+    assert entries["百"]["strokeCount"] == 6
+
+
+def test_v2_exports_two_and_three_part_modifiers_arrays():
+    df = pd.DataFrame([
+        {"漢字": "一", "漢検級": "10級", "画数": "1"},
+        {"漢字": "二", "漢検級": "10級", "画数": "2", "ペア1_部品1": "一", "ペア1_部品2": "一"},
+        {"漢字": "三", "漢検級": "10級", "画数": "3", "ペア1_部品1": "一", "ペア1_部品2": "一", "ペア1_部品3": "一"},
+    ])
+    entries = {item["baseKanji"]: item for item in build_kanji_database_v2(df)["kanjiDatas"]}
+    assert entries["一"]["kanjiTransforms"] == [
+        {"modifiers": ["一"], "results": ["二"]},
+        {"modifiers": ["一", "一"], "results": ["三"]},
+    ]
+
+
+def test_v2_conversion_helpers_handle_invalid_values():
+    assert level_to_float("1級") == 1.0
+    assert level_to_float("準1級") == 1.5
+    assert stroke_count_to_int("16") == 16
+    assert stroke_count_to_int("16.5") is None
+    assert stroke_count_to_int("") is None

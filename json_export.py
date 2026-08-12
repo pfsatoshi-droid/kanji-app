@@ -19,6 +19,21 @@ LEVEL_NUMBERS = {
     "1級": -1,
 }
 
+V2_LEVEL_NUMBERS = {
+    "10級": 10.0,
+    "9級": 9.0,
+    "8級": 8.0,
+    "7級": 7.0,
+    "6級": 6.0,
+    "5級": 5.0,
+    "4級": 4.0,
+    "3級": 3.0,
+    "準2級": 2.5,
+    "2級": 2.0,
+    "準1級": 1.5,
+    "1級": 1.0,
+}
+
 PAIR_COLUMN_PATTERN = re.compile(r"^ペア(\d+)_部品([123])$")
 
 
@@ -26,7 +41,6 @@ def level_to_number(level):
     """10級を10として、級区分が上がるごとに1ずつ減らす。"""
     if pd.isna(level):
         return None
-
     value = str(level).strip()
     if not value:
         return None
@@ -39,6 +53,34 @@ def level_to_number(level):
     except ValueError:
         return None
 
+
+def level_to_float(level):
+    """新JSON用に漢検級を常にfloatへ変換する。"""
+    if pd.isna(level):
+        return None
+    value = str(level).strip()
+    if not value:
+        return None
+    if value in V2_LEVEL_NUMBERS:
+        return V2_LEVEL_NUMBERS[value]
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def stroke_count_to_int(value):
+    """画数を整数へ変換し、空欄・不正値はnull用のNoneにする。"""
+    if pd.isna(value):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        number = float(text)
+        return int(number) if number.is_integer() else None
+    except ValueError:
+        return None
 
 def find_pair_numbers(columns):
     """データに実在する部品ペア番号を昇順で返す。"""
@@ -112,6 +154,60 @@ def build_kanji_database(df):
     return {"kanjiDatas": kanji_datas}
 
 
+def build_kanji_database_v2(df):
+    """配列modifiers・画数・float級を含む、2/3部品対応JSONを作る。"""
+    if "漢字" not in df.columns:
+        raise ValueError("「漢字」列が見つかりません。")
+
+    working_df = df.fillna("").astype(str).copy()
+    working_df["漢字"] = working_df["漢字"].str.strip()
+    working_df = working_df[working_df["漢字"] != ""]
+    working_df = working_df.drop_duplicates(subset=["漢字"], keep="first")
+
+    level_column = "漢検級" if "漢検級" in working_df.columns else "級"
+    pair_numbers = find_pair_numbers(working_df.columns)
+    registered_kanji = set(working_df["漢字"])
+    transforms = {kanji: {} for kanji in working_df["漢字"]}
+
+    for _, row in working_df.iterrows():
+        result = row["漢字"]
+        for pair_number in pair_numbers:
+            parts = [
+                str(row.get(f"ペア{pair_number}_部品{position}", "")).strip()
+                for position in (1, 2, 3)
+            ]
+            parts = [part for part in parts if part]
+            if len(parts) < 2 or any(part not in registered_kanji for part in parts):
+                continue
+
+            # 各部品をbaseにし、残りをmodifiersとして逆引き可能にする。
+            for base_index, base in enumerate(parts):
+                modifiers = tuple(parts[:base_index] + parts[base_index + 1:])
+                results = transforms[base].setdefault(modifiers, [])
+                if result not in results:
+                    results.append(result)
+
+    kanji_datas = []
+    for _, row in working_df.iterrows():
+        base_kanji = row["漢字"]
+        kanji_datas.append({
+            "baseKanji": base_kanji,
+            "level": level_to_float(row.get(level_column, "")),
+            "strokeCount": stroke_count_to_int(row.get("画数", "")),
+            "kanjiTransforms": [
+                {"modifiers": list(modifiers), "results": results}
+                for modifiers, results in transforms[base_kanji].items()
+            ],
+        })
+
+    return {"kanjiDatas": kanji_datas}
+
+
 def to_json_text(df):
     """日本語をエスケープせず、見やすく整形したJSON文字列を返す。"""
     return json.dumps(build_kanji_database(df), ensure_ascii=False, indent=2)
+
+
+def to_json_text_v2(df):
+    """新形式JSONを日本語をエスケープせず整形して返す。"""
+    return json.dumps(build_kanji_database_v2(df), ensure_ascii=False, indent=2)
