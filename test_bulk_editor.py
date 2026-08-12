@@ -1,6 +1,12 @@
 import pandas as pd
 
-from bulk_editor import clean_editor_df, prepare_editor_df, sort_editor_df, validate_editor_df
+from bulk_editor import (
+    clean_editor_df,
+    get_hidden_editor_columns,
+    prepare_editor_df,
+    sort_editor_df,
+    validate_editor_df,
+)
 
 
 def test_prepare_adds_optional_third_part_without_changing_two_part_values():
@@ -67,3 +73,11 @@ def test_sort_by_kanji_can_descend():
     source = pd.DataFrame([{"漢字": "一"}, {"漢字": "三"}, {"漢字": "二"}])
     result = sort_editor_df(source, sort_by="漢字", ascending=False)
     assert result["漢字"].tolist() == ["二", "三", "一"]
+
+
+def test_review_columns_can_be_shown_or_hidden_while_memo_stays_hidden():
+    columns = ["漢字", "メモ", "ペア1_審議", "ペア1_審議理由"]
+    assert get_hidden_editor_columns(columns, show_review=False) == [
+        "メモ", "ペア1_審議", "ペア1_審議理由"
+    ]
+    assert get_hidden_editor_columns(columns, show_review=True) == ["メモ"]

@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from bulk_editor import prepare_editor_df, sort_editor_df, validate_editor_df
+from bulk_editor import get_hidden_editor_columns, prepare_editor_df, sort_editor_df, validate_editor_df
 from data_store import load_df, save_df_to_sheet
 from pair_utils import get_pair_numbers
 
@@ -18,7 +18,7 @@ except Exception as error:
     st.stop()
 
 existing_pair_count = max(get_pair_numbers(source_df), default=0)
-settings_col1, settings_col2, settings_col3 = st.columns(3)
+settings_col1, settings_col2, settings_col3, settings_col4 = st.columns(4)
 with settings_col1:
     visible_pair_count = st.number_input(
         "表示するペア数",
@@ -40,14 +40,16 @@ with settings_col3:
         horizontal=True,
         disabled=(sort_by == "元の順序"),
     )
+with settings_col4:
+    show_review = st.checkbox(
+        "審議項目を表示",
+        value=False,
+        help="オンにすると、各ペアの審議と審議理由を表に表示して編集できます。",
+    )
 
 editor_df = prepare_editor_df(source_df, visible_pair_count=visible_pair_count)
 editor_df = sort_editor_df(editor_df, sort_by=sort_by, ascending=(sort_direction == "昇順"))
-hidden_columns = ["メモ"] + [
-    column
-    for column in editor_df.columns
-    if column.endswith("_審議") or column.endswith("_審議理由")
-]
+hidden_columns = get_hidden_editor_columns(editor_df.columns, show_review=show_review)
 column_config = {
     "漢字": st.column_config.TextColumn("漢字", width="small", max_chars=1),
     "画数": st.column_config.TextColumn("画数", width="small"),
@@ -57,6 +59,17 @@ column_config = {
         width="small",
     ),
 }
+if show_review:
+    for pair_number in range(1, visible_pair_count + 1):
+        column_config[f"ペア{pair_number}_審議"] = st.column_config.SelectboxColumn(
+            f"ペア{pair_number}_審議",
+            options=["", "TRUE"],
+            width="small",
+        )
+        column_config[f"ペア{pair_number}_審議理由"] = st.column_config.TextColumn(
+            f"ペア{pair_number}_審議理由",
+            width="medium",
+        )
 column_config.update({column: None for column in hidden_columns})
 
 st.caption(
