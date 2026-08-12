@@ -192,7 +192,7 @@ def build_kanji_database_v2(df):
         base_kanji = row["漢字"]
         kanji_datas.append({
             "baseKanji": base_kanji,
-            "level": level_to_float(row.get(level_column, "")),
+            "grade": level_to_float(row.get(level_column, "")),
             "strokeCount": stroke_count_to_int(row.get("画数", "")),
             "kanjiTransforms": [
                 {"modifiers": list(modifiers), "results": results}
