@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style
 from data_store import load_df
 from pair_utils import get_pair_numbers
 
 st.set_page_config(page_title="部品ランキング・逆引き", layout="wide")
+apply_app_style()
 
 st.title("部品ランキング・逆引き")
 

@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style
 from datetime import datetime
 from data_store import (
     load_auto_backup_df,
@@ -9,6 +10,7 @@ from data_store import (
 )
 
 st.set_page_config(page_title="漢字DB バックアップアプリ", layout="wide")
+apply_app_style()
 
 st.title("漢字DB バックアップアプリ")
 

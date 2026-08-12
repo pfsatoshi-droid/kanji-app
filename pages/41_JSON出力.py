@@ -2,6 +2,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from app_ui import apply_app_style, page_header
 from data_store import load_df
 from json_export import (
     build_kanji_database,
@@ -12,18 +13,11 @@ from json_export import (
 
 
 st.set_page_config(page_title="JSON出力", layout="wide")
-
-st.title("JSON出力")
-st.write(
-    """
-    Googleスプレッドシート上の全漢字を読み込み、
-    漢字と部品の組み合わせをゲーム用JSONとして出力します。
-    漢検級による絞り込みは行いません。
-    """
-)
+apply_app_style()
+page_header("ゲーム用JSONを出力", "新しいゲーム向け形式と、旧バージョン互換形式を選んで書き出します。", "データ出力")
 
 output_format = st.radio(
-    "出力形式",
+    "形式を選択",
     ["新形式（2・3部品対応）", "旧ゲーム互換形式（2部品のみ）"],
     help="旧形式は既存ゲームとの互換性を保ちます。新形式はmodifiers配列・画数・小数の級に対応します。",
 )
@@ -61,13 +55,13 @@ if three_part_count and output_format.startswith("旧ゲーム互換形式"):
         "旧ゲーム互換形式は2部品のみのため、この出力には含めていません。"
     )
 
-st.subheader("出力内容のプレビュー")
+st.subheader("内容を確認")
 st.json({"kanjiDatas": kanji_datas[:5]}, expanded=2)
 if len(kanji_datas) > 5:
     st.caption("画面には先頭5字のみ表示しています。ダウンロードには全件が含まれます。")
 
 st.divider()
-st.subheader("JSONとして保存")
+st.subheader("ダウンロード")
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 format_suffix = "v2" if output_format.startswith("新形式") else "legacy"

@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style, page_header
 from data_store import load_df, save_df_to_sheet
 from pair_utils import (
     ensure_pair_columns,
@@ -11,8 +12,8 @@ from pair_utils import (
 )
 
 st.set_page_config(page_title="漢字編集・検索", layout="wide")
-
-st.title("漢字編集・検索")
+apply_app_style()
+page_header("漢字を個別編集", "1文字を検索し、基本情報・分解候補・審議状態を詳しく編集します。", "データ編集")
 
 
 # =========================

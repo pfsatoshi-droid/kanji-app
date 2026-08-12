@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from app_ui import apply_app_style
 
 from jukugo_store import (
     DEFAULT_JUKUGO_COLUMNS,
@@ -14,6 +15,7 @@ from jukugo_store import (
 
 
 st.set_page_config(page_title="熟語編集・登録", layout="wide")
+apply_app_style()
 st.title("熟語編集・登録")
 st.caption("熟語はGoogleスプレッドシート内の別シートで管理します。")
 

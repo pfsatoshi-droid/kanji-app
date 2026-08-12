@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style
 from data_store import load_df
 
 st.set_page_config(page_title="漢字リスト照合アプリ", layout="wide")
+apply_app_style()
 
 st.title("漢字リスト照合アプリ")
 
