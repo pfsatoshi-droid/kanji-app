@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from bulk_editor import prepare_editor_df, validate_editor_df
+from bulk_editor import prepare_editor_df, sort_editor_df, validate_editor_df
 from data_store import load_df, save_df_to_sheet
 from pair_utils import get_pair_numbers
 
@@ -18,16 +18,31 @@ except Exception as error:
     st.stop()
 
 existing_pair_count = max(get_pair_numbers(source_df), default=0)
-visible_pair_count = st.number_input(
-    "表示するペア数",
-    min_value=1,
-    max_value=20,
-    value=max(existing_pair_count, 4),
-    step=1,
-    help="新しいペアを入力したい場合は、必要な数まで増やしてください。",
-)
+settings_col1, settings_col2, settings_col3 = st.columns(3)
+with settings_col1:
+    visible_pair_count = st.number_input(
+        "表示するペア数",
+        min_value=1,
+        max_value=20,
+        value=max(existing_pair_count, 4),
+        step=1,
+        help="新しいペアを入力したい場合は、必要な数まで増やしてください。",
+    )
+with settings_col2:
+    sort_by = st.selectbox(
+        "並び替え",
+        ["元の順序", "漢検級", "画数", "漢字"],
+    )
+with settings_col3:
+    sort_direction = st.radio(
+        "方向",
+        ["昇順", "降順"],
+        horizontal=True,
+        disabled=(sort_by == "元の順序"),
+    )
 
 editor_df = prepare_editor_df(source_df, visible_pair_count=visible_pair_count)
+editor_df = sort_editor_df(editor_df, sort_by=sort_by, ascending=(sort_direction == "昇順"))
 hidden_columns = ["メモ"] + [
     column
     for column in editor_df.columns
@@ -47,6 +62,8 @@ column_config.update({column: None for column in hidden_columns})
 st.caption(
     "部品1・部品2は必須、部品3は任意です。表の最下部から行を追加でき、左端の行メニューから削除できます。"
 )
+if sort_by != "元の順序":
+    st.info(f"{sort_by}の{sort_direction}で表示しています。一括保存すると、この行順がスプレッドシートにも反映されます。")
 
 edited_df = st.data_editor(
     editor_df,

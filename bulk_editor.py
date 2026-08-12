@@ -4,6 +4,13 @@ from pair_utils import ensure_pair_columns, get_pair_numbers, normalize_legacy_c
 
 
 BASE_COLUMNS = ["漢字", "画数", "漢検級", "メモ"]
+KANKEN_ORDER = {
+    level: order
+    for order, level in enumerate([
+        "10級", "9級", "8級", "7級", "6級", "5級", "4級",
+        "3級", "準2級", "2級", "準1級", "1級",
+    ], start=1)
+}
 
 
 def prepare_editor_df(df, visible_pair_count=4):
@@ -48,6 +55,37 @@ def clean_editor_df(df):
         axis=1,
     )
     return result[nonempty_mask].reset_index(drop=True)
+
+
+def sort_editor_df(df, sort_by="元の順序", ascending=True):
+    """編集表の行を指定項目で安定ソートする。空欄・不明値は末尾に置く。"""
+    result = df.copy()
+    if sort_by == "元の順序":
+        return result.reset_index(drop=True)
+
+    if sort_by == "漢検級":
+        result["_primary_sort"] = result.get("漢検級", "").map(
+            lambda value: KANKEN_ORDER.get(normalize_part(value), float("nan"))
+        )
+        secondary_columns = [column for column in ["画数", "漢字"] if column in result.columns]
+    elif sort_by == "画数":
+        result["_primary_sort"] = pd.to_numeric(result.get("画数", ""), errors="coerce")
+        secondary_columns = [column for column in ["漢字"] if column in result.columns]
+    elif sort_by == "漢字":
+        result["_primary_sort"] = result.get("漢字", "").map(
+            lambda value: normalize_part(value) or None
+        )
+        secondary_columns = []
+    else:
+        raise ValueError(f"未対応の並び替え項目です: {sort_by}")
+
+    result = result.sort_values(
+        ["_primary_sort"] + secondary_columns,
+        ascending=[ascending] + [True] * len(secondary_columns),
+        na_position="last",
+        kind="stable",
+    )
+    return result.drop(columns=["_primary_sort"]).reset_index(drop=True)
 
 
 def validate_editor_df(df):
