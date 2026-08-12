@@ -66,13 +66,14 @@ def test_three_part_decomposition_is_not_misrepresented_as_binary_json():
     assert entries["一"]["kanjiTransforms"] == [{"modifier": "白", "results": ["自"]}]
 
 
-def test_v2_uses_float_levels_and_integer_stroke_count():
+def test_v2_uses_float_grades_and_integer_stroke_count():
     df = sample_df()
     df["画数"] = ["1", "5", "6", "6"]
     df.loc[df["漢字"] == "百", "漢検級"] = "準2級"
     entries = {item["baseKanji"]: item for item in build_kanji_database_v2(df)["kanjiDatas"]}
-    assert entries["百"]["level"] == 2.5
-    assert isinstance(entries["百"]["level"], float)
+    assert entries["百"]["grade"] == 2.5
+    assert isinstance(entries["百"]["grade"], float)
+    assert "level" not in entries["百"]
     assert entries["百"]["strokeCount"] == 6
 
 
