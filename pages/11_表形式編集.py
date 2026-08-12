@@ -8,7 +8,7 @@ from pair_utils import get_pair_numbers
 
 st.set_page_config(page_title="表形式で編集", layout="wide")
 st.title("表形式で編集")
-st.write("CSVや表計算ソフトのようにセルを直接編集し、まとめて保存できます。行の追加・削除も可能です。")
+st.write("CSVや表計算ソフトのように漢字・画数・漢検級・部品を直接編集し、まとめて保存できます。")
 
 try:
     source_df = load_df()
@@ -28,6 +28,21 @@ visible_pair_count = st.number_input(
 )
 
 editor_df = prepare_editor_df(source_df, visible_pair_count=visible_pair_count)
+hidden_columns = ["メモ"] + [
+    column
+    for column in editor_df.columns
+    if column.endswith("_審議") or column.endswith("_審議理由")
+]
+column_config = {
+    "漢字": st.column_config.TextColumn("漢字", width="small", max_chars=1),
+    "画数": st.column_config.TextColumn("画数", width="small"),
+    "漢検級": st.column_config.SelectboxColumn(
+        "漢検級",
+        options=["", "10級", "9級", "8級", "7級", "6級", "5級", "4級", "3級", "準2級", "2級", "準1級", "1級"],
+        width="small",
+    ),
+}
+column_config.update({column: None for column in hidden_columns})
 
 st.caption(
     "部品1・部品2は必須、部品3は任意です。表の最下部から行を追加でき、左端の行メニューから削除できます。"
@@ -40,16 +55,7 @@ edited_df = st.data_editor(
     num_rows="dynamic",
     height=620,
     key="kanji_table_editor",
-    column_config={
-        "漢字": st.column_config.TextColumn("漢字", width="small", max_chars=1),
-        "画数": st.column_config.TextColumn("画数", width="small"),
-        "漢検級": st.column_config.SelectboxColumn(
-            "漢検級",
-            options=["", "10級", "9級", "8級", "7級", "6級", "5級", "4級", "3級", "準2級", "2級", "準1級", "1級"],
-            width="small",
-        ),
-        "メモ": st.column_config.TextColumn("メモ", width="large"),
-    },
+    column_config=column_config,
 )
 
 cleaned_df, errors_df = validate_editor_df(edited_df)

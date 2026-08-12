@@ -65,21 +65,12 @@ def validate_editor_df(df):
 
         for pair_number in get_pair_numbers(cleaned):
             parts = [normalize_part(row.get(f"ペア{pair_number}_部品{i}", "")) for i in (1, 2, 3)]
-            review = normalize_part(row.get(f"ペア{pair_number}_審議", ""))
-            reason = normalize_part(row.get(f"ペア{pair_number}_審議理由", ""))
             if any(parts) and (not parts[0] or not parts[1]):
                 errors.append({
                     "行": sheet_row,
                     "列": f"ペア{pair_number}",
                     "内容": "部品1・部品2は必須、部品3は任意です。",
                 })
-            if (review or reason) and not any(parts):
-                errors.append({
-                    "行": sheet_row,
-                    "列": f"ペア{pair_number}",
-                    "内容": "審議情報を入れる場合は部品も入力してください。",
-                })
-
     kanji_series = cleaned.get("漢字", pd.Series(dtype=str)).map(normalize_part)
     duplicate_values = set(kanji_series[kanji_series.ne("") & kanji_series.duplicated(keep=False)])
     for row_index, kanji in kanji_series.items():

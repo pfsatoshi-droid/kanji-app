@@ -33,3 +33,11 @@ def test_validation_rejects_duplicate_kanji_and_incomplete_parts():
     _, errors = validate_editor_df(source)
     assert len(errors[errors["内容"].str.contains("重複")]) == 2
     assert len(errors[errors["内容"].str.contains("部品1・部品2")]) == 1
+
+
+def test_hidden_review_data_does_not_block_table_save():
+    source = pd.DataFrame([{"漢字": "明", "ペア1_審議": "TRUE", "ペア1_審議理由": "確認中"}])
+    cleaned, errors = validate_editor_df(source)
+    assert errors.empty
+    assert cleaned.loc[0, "ペア1_審議"] == "TRUE"
+    assert cleaned.loc[0, "ペア1_審議理由"] == "確認中"
