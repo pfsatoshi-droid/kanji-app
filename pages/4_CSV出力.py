@@ -60,7 +60,7 @@ if sort_output:
 if convert_level_to_number:
     st.caption("漢検級の変換例：10級→10、準2級→2.5、2級→2、準1級→1.5、1級→1")
 
-st.caption("標準では st1_first, st1_second 〜 st4_first, st4_second まで出力します。")
+st.caption("標準では st1_first, st1_second, st1_third 〜 st4_third まで出力します。部品3は未登録なら空欄です。")
 
 # =========================
 # 変換用関数
@@ -194,9 +194,11 @@ def convert_df(df, max_pairs=4, include_memo=True, convert_level_to_number=False
     for i in range(1, max_pairs + 1):
         src_first = f"ペア{i}_部品1"
         src_second = f"ペア{i}_部品2"
+        src_third = f"ペア{i}_部品3"
 
         dst_first = f"st{i}_first"
         dst_second = f"st{i}_second"
+        dst_third = f"st{i}_third"
 
         if src_first in df.columns:
             out[dst_first] = df[src_first]
@@ -207,6 +209,11 @@ def convert_df(df, max_pairs=4, include_memo=True, convert_level_to_number=False
             out[dst_second] = df[src_second]
         else:
             out[dst_second] = ""
+
+        if src_third in df.columns:
+            out[dst_third] = df[src_third]
+        else:
+            out[dst_third] = ""
 
     return out
 

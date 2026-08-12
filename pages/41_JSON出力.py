@@ -31,10 +31,20 @@ transform_count = sum(
     len(item["kanjiTransforms"])
     for item in kanji_datas
 )
+third_part_columns = [column for column in df.columns if str(column).endswith("_部品3")]
+three_part_count = sum(
+    df[column].fillna("").astype(str).str.strip().ne("").sum()
+    for column in third_part_columns
+)
 
 st.success(
     f"全 {len(kanji_datas)} 字、組み合わせ {transform_count} 件のJSONを作成しました。"
 )
+if three_part_count:
+    st.info(
+        f"3部品の分解 {three_part_count} 件は保存されていますが、"
+        "現在のゲーム用JSONは2部品形式のため、この出力には含めていません。"
+    )
 
 st.subheader("出力内容のプレビュー")
 st.json({"kanjiDatas": kanji_datas[:5]}, expanded=2)

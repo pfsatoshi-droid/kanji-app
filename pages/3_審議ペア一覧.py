@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data_store import load_df, save_df_to_sheet
+from pair_utils import format_parts, get_pair_numbers
 
 st.set_page_config(page_title="審議ペア一覧", layout="wide")
 
@@ -32,16 +33,6 @@ if "漢字" not in df.columns:
 # =========================
 # 便利関数
 # =========================
-def get_pair_numbers(df):
-    nums = []
-    for col in df.columns:
-        if col.startswith("ペア") and col.endswith("_部品1"):
-            num = col.replace("ペア", "").replace("_部品1", "")
-            if num.isdigit():
-                nums.append(int(num))
-    return sorted(nums)
-
-
 def build_review_pairs_df(df):
     records = []
 
@@ -60,10 +51,11 @@ def build_review_pairs_df(df):
         for n in pair_nums:
             part1 = str(row.get(f"ペア{n}_部品1", "")).strip()
             part2 = str(row.get(f"ペア{n}_部品2", "")).strip()
+            part3 = str(row.get(f"ペア{n}_部品3", "")).strip()
             review = str(row.get(f"ペア{n}_審議", "")).strip()
             reason = str(row.get(f"ペア{n}_審議理由", "")).strip()
 
-            if part1 == "" and part2 == "":
+            if part1 == "" and part2 == "" and part3 == "":
                 continue
 
             if review == "TRUE" or reason != "":
@@ -77,6 +69,7 @@ def build_review_pairs_df(df):
                         "ペア番号": n,
                         "部品1": part1,
                         "部品2": part2,
+                        "部品3": part3,
                         "審議": "TRUE" if review == "TRUE" else "",
                         "審議理由": reason,
                         "メモ": memo,
@@ -96,6 +89,7 @@ def build_review_pairs_df(df):
             "ペア番号",
             "部品1",
             "部品2",
+            "部品3",
             "審議",
             "審議理由",
             "メモ",
@@ -150,6 +144,7 @@ if part_query.strip():
     filtered_df = filtered_df[
         filtered_df["部品1"].astype(str).str.contains(q, na=False)
         | filtered_df["部品2"].astype(str).str.contains(q, na=False)
+        | filtered_df["部品3"].astype(str).str.contains(q, na=False)
     ]
 
 if reason_query.strip():
@@ -180,7 +175,7 @@ else:
 
     for _, row in filtered_df.iterrows():
         labels.append(
-            f"{row['df_index']}|{row['ペア番号']}|{row['漢字']} → {row['部品1']}, {row['部品2']}｜{row['審議理由']}"
+            f"{row['df_index']}|{row['ペア番号']}|{row['漢字']} → {format_parts((row['部品1'], row['部品2'], row['部品3']))}｜{row['審議理由']}"
         )
 
     selected_label = st.selectbox(
@@ -203,6 +198,7 @@ else:
             "漢字": selected_row["漢字"],
             "部品1": selected_row["部品1"],
             "部品2": selected_row["部品2"],
+            "部品3": selected_row["部品3"],
             "審議理由": selected_row["審議理由"],
         }
     )
