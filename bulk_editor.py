@@ -13,6 +13,18 @@ KANKEN_ORDER = {
 }
 
 
+def get_hidden_editor_columns(columns, show_review=False):
+    """メモは常に隠し、審議関連列は表示設定に応じて切り替える。"""
+    hidden = [column for column in columns if column == "メモ"]
+    if not show_review:
+        hidden.extend(
+            column
+            for column in columns
+            if column.endswith("_審議") or column.endswith("_審議理由")
+        )
+    return hidden
+
+
 def prepare_editor_df(df, visible_pair_count=4):
     """編集表用に列を揃え、既存値を文字列として安全に保持する。"""
     result = normalize_legacy_columns(df.copy()).fillna("").astype(str)
