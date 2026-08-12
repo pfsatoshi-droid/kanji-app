@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import streamlit as st
+from app_ui import apply_app_style
 
 from jukugo_json_export import (
     build_jukugo_database,
@@ -11,6 +12,7 @@ from jukugo_store import load_jukugo_df
 
 
 st.set_page_config(page_title="熟語JSON出力", layout="wide")
+apply_app_style()
 
 st.title("熟語JSON出力")
 st.write(

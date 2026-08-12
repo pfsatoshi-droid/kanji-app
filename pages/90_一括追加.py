@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style
 from data_store import load_df, save_df_to_sheet
 
 st.set_page_config(page_title="漢字情報 一括追加アプリ", layout="centered")
+apply_app_style()
 
 st.title("漢字情報 一括追加アプリ")
 

@@ -1,6 +1,7 @@
 import re
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style
 from data_store import load_df, save_df_to_sheet
 from pair_utils import (
     ensure_pair_columns,
@@ -11,6 +12,7 @@ from pair_utils import (
 )
 
 st.set_page_config(page_title="漢字ペア CSV取り込みアプリ", layout="wide")
+apply_app_style()
 
 st.title("漢字ペア CSV取り込みアプリ")
 

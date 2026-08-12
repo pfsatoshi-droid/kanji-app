@@ -1,18 +1,12 @@
 import streamlit as st
 import pandas as pd
+from app_ui import apply_app_style, page_header
 from data_store import load_df, save_df_to_sheet
 from pair_utils import format_parts, get_pair_numbers
 
 st.set_page_config(page_title="審議ペア一覧", layout="wide")
-
-st.title("審議ペア一覧")
-
-st.write(
-    """
-    シート1に登録されている部品ペアのうち、
-    審議対象になっているものだけを一覧表示します。
-    """
-)
+apply_app_style()
+page_header("審議中の分解", "判断が必要な分解候補だけを絞り込み、確認・解除できます。", "品質管理")
 
 
 # =========================

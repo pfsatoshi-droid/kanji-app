@@ -3,8 +3,10 @@ import pandas as pd
 import re
 from datetime import datetime
 from data_store import load_df, save_df_to_sheet
+from app_ui import apply_app_style
 
 st.set_page_config(page_title="漢字行 削除アプリ", layout="wide")
+apply_app_style()
 
 st.title("漢字行 削除アプリ")
 

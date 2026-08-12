@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from data_store import load_df
+from app_ui import apply_app_style
 
 st.set_page_config(page_title="CSVに変換", layout="wide")
+apply_app_style()
 
 st.title("CSVに変換")
 

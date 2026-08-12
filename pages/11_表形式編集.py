@@ -1,14 +1,16 @@
 import pandas as pd
 import streamlit as st
 
+from app_ui import apply_app_style, mobile_note, page_header
 from bulk_editor import get_hidden_editor_columns, prepare_editor_df, sort_editor_df, validate_editor_df
 from data_store import load_df, save_df_to_sheet
 from pair_utils import get_pair_numbers
 
 
 st.set_page_config(page_title="表形式で編集", layout="wide")
-st.title("表形式で編集")
-st.write("CSVや表計算ソフトのように漢字・画数・漢検級・部品を直接編集し、まとめて保存できます。")
+apply_app_style()
+page_header("表形式で編集", "漢字・画数・漢検級・部品を、表計算ソフトの感覚でまとめて更新します。", "データ編集")
+mobile_note("大量編集はPCがおすすめです。スマホでは個別編集画面のほうが操作しやすくなっています。")
 
 try:
     source_df = load_df()
@@ -18,6 +20,7 @@ except Exception as error:
     st.stop()
 
 existing_pair_count = max(get_pair_numbers(source_df), default=0)
+st.markdown("#### 表示と並び順")
 settings_col1, settings_col2, settings_col3, settings_col4 = st.columns(4)
 with settings_col1:
     visible_pair_count = st.number_input(
@@ -102,7 +105,10 @@ if not errors_df.empty:
     st.error(f"修正が必要な箇所が {len(errors_df)} 件あります。")
     st.dataframe(errors_df, use_container_width=True, hide_index=True)
 
-confirm_save = st.checkbox("表示中の内容でGoogleスプレッドシート全体を更新する")
+st.divider()
+st.markdown("### 保存")
+st.caption("保存前に自動バックアップを作成します。エラーがある場合は保存できません。")
+confirm_save = st.checkbox("変更内容を確認し、Googleスプレッドシート全体を更新する")
 
 if st.button(
     "表の内容を一括保存",
